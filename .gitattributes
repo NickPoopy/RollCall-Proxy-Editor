@@ -1,0 +1,3 @@
+* text=auto eol=lf
+# Proxy files are CRLF and must stay byte-exact for the round-trip tests.
+samples/** -text
