@@ -3,6 +3,7 @@ import { sortNetNames } from '../model/ops';
 import { openFile, saveFile } from '../state/files';
 import { useStore } from '../state/store';
 import { useSchemes } from '../state/schemes';
+import { THEMES, useTheme, type ThemeId } from '../state/theme';
 import { EXAMPLE_TEXT, NEW_TEMPLATE } from '../state/templates';
 
 const REPO_URL = 'https://github.com/NickPoopy/RollCall-Proxy-Editor';
@@ -63,6 +64,8 @@ export function Toolbar() {
   const canUndo = useStore((s) => s.past.length > 0);
   const canRedo = useStore((s) => s.future.length > 0);
   const { undo, redo, apply } = useStore.getState();
+  const theme = useTheme((s) => s.theme);
+  const setTheme = useTheme((s) => s.setTheme);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -113,6 +116,16 @@ export function Toolbar() {
         {fileName}
         {dirty && <span className="dirty" title="Unsaved changes">●</span>}
       </div>
+      <label className="theme-picker" title="Colour theme">
+        <span className="muted">Theme</span>
+        <select value={theme} onChange={(e) => setTheme(e.target.value as ThemeId)} aria-label="Colour theme">
+          {THEMES.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </label>
       <a className="help" href={REPO_URL} target="_blank" rel="noreferrer">Help</a>
     </header>
   );

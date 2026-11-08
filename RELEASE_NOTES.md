@@ -17,6 +17,7 @@ First usable alpha of RollCall Proxy Editor.
 - Devices (IpShare) table and settings editor for the other sections
 - Validation of addresses, IPs, ports and tree shape
 - Undo / redo and browser draft autosave
+- Colour themes: Default Dark, Kimbie Dark, Solarized Dark, Solarized Light and Monokai Dimmed
 
 ### Known limitations
 - The preview can't show real device names or versions (those come from the device), so it shows `Device @ <ip>` placeholders.

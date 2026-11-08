@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
 import CodeMirror, { type ReactCodeMirrorRef } from '@uiw/react-codemirror';
-import { StreamLanguage } from '@codemirror/language';
+import { HighlightStyle, StreamLanguage, syntaxHighlighting } from '@codemirror/language';
+import { tags } from '@lezer/highlight';
+import { isDarkTheme, useTheme } from '../state/theme';
 import { properties } from '@codemirror/legacy-modes/mode/properties';
 import { linter, lintGutter, type Diagnostic as CmDiagnostic } from '@codemirror/lint';
 import { StateEffect, StateField, type Extension } from '@codemirror/state';
@@ -50,11 +52,33 @@ const proxyLinter = linter(
   { delay: 300 },
 );
 
-const theme = EditorView.theme({
-  '&': { height: '100%', fontSize: '12.5px' },
+// Colours come from the app's CSS variables, so the editor follows the selected theme.
+const themeSpec = {
+  '&': { height: '100%', fontSize: '12.5px', backgroundColor: 'var(--cm-bg)', color: 'var(--text)' },
   '.cm-scroller': { fontFamily: 'var(--mono)' },
+  '.cm-content': { caretColor: 'var(--text)' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--text)' },
+  '.cm-gutters': { backgroundColor: 'var(--cm-gutter)', color: 'var(--muted)', borderRight: '1px solid var(--border)' },
+  '.cm-activeLine': { backgroundColor: 'var(--cm-active)' },
+  '.cm-activeLineGutter': { backgroundColor: 'var(--cm-active)', color: 'var(--text)' },
+  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': { backgroundColor: 'var(--cm-selection)' },
   '.cm-selected-net': { backgroundColor: 'var(--sel-line)' },
-});
+  '.cm-tooltip': { backgroundColor: 'var(--panel-2)', color: 'var(--text)', border: '1px solid var(--border)' },
+  '.cm-panels': { backgroundColor: 'var(--panel-2)', color: 'var(--text)' },
+  '.cm-searchMatch': { backgroundColor: 'var(--warning-bg)', outline: '1px solid var(--warning)' },
+};
+const darkTheme = EditorView.theme(themeSpec, { dark: true });
+const lightTheme = EditorView.theme(themeSpec, { dark: false });
+
+// INI tokens: [Section] = heading, key = definition, value = quote, ; comment.
+const iniHighlight = syntaxHighlighting(
+  HighlightStyle.define([
+    { tag: tags.heading, color: 'var(--syn-header)', fontWeight: 'bold' },
+    { tag: [tags.definition(tags.variableName), tags.variableName, tags.definition(tags.name)], color: 'var(--syn-key)' },
+    { tag: tags.quote, color: 'var(--syn-value)' },
+    { tag: tags.comment, color: 'var(--syn-comment)', fontStyle: 'italic' },
+  ]),
+);
 
 export function RawTextPane() {
   const text = useStore((s) => s.text);
@@ -64,6 +88,7 @@ export function RawTextPane() {
   const parseErrors = useStore((s) => s.parseErrors);
   const numbering = useStore((s) => s.issues.find((i) => i.code === 'ipshare-numbering'));
   const ref = useRef<ReactCodeMirrorRef>(null);
+  const appTheme = useTheme((s) => s.theme);
   const editorText = useMemo(() => text.replace(/\r\n/g, '\n'), [text]);
 
   const extensions = useMemo<Extension[]>(
@@ -72,7 +97,7 @@ export function RawTextPane() {
       lintGutter(),
       proxyLinter,
       highlightField,
-      theme,
+      iniHighlight,
       EditorView.updateListener.of((u) => {
         if (import.meta.env.DEV) (window as unknown as { __rpeView: EditorView }).__rpeView = u.view;
         if (!u.selectionSet || !u.view.hasFocus) return;
@@ -126,7 +151,7 @@ export function RawTextPane() {
           ref={ref}
           value={editorText}
           height="100%"
-          theme="dark"
+          theme={isDarkTheme(appTheme) ? darkTheme : lightTheme}
           extensions={extensions}
           onChange={(v) => {
             // CodeMirror always uses LF internally; keep the file's own line endings in the store.

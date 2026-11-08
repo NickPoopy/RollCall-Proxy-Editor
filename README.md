@@ -39,6 +39,7 @@ Click a net in any pane and it's highlighted in the other two.
 - **IpShare numbering**: RollCall needs `IpShare0, 1, 2…` in order with no gaps or repeats. Every edit made through the editor rewrites them in sequence automatically. Gaps from hand-editing the raw text are flagged with a **Renumber** button, and Save always renumbers first.
 - **Validation**: duplicate addresses, unnamed parents, bad IPs/ports, more than 15 children, duplicate IP:port.
 - **Undo / redo**, plus a draft autosave in the browser so a closed tab doesn't lose work.
+- **Themes**: Default Dark, plus Kimbie Dark, Solarized Dark, Solarized Light and Monokai Dimmed based on the VS Code themes. Pick one from **Theme** in the toolbar; the choice is remembered. The RollCall preview keeps RollCall's own colours so it still looks like the real thing.
 - Everything runs locally in your browser. Files are never uploaded anywhere.
 
 ## How the proxy file maps to the tree
