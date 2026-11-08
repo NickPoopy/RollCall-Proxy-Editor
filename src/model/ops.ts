@@ -20,7 +20,7 @@ import type { Entry, IpShare, NetAddr, ProxyDoc } from './types';
  */
 export class OpError extends Error {}
 
-function usedAddrs(doc: ProxyDoc): Set<NetAddr> {
+export function usedAddrs(doc: ProxyDoc): Set<NetAddr> {
   const s = new Set<NetAddr>();
   doc.netNames.forEach((n) => s.add(n.addr));
   doc.ipShares.forEach((x) => s.add(x.net));
@@ -160,7 +160,7 @@ export function removeSubtree(doc: ProxyDoc, addr: NetAddr): ProxyDoc {
 }
 
 /** Map an address from one subtree root to another, which may be at a different depth. */
-function rebaseAddr(a: NetAddr, from: NetAddr, to: NetAddr): NetAddr {
+export function rebaseAddr(a: NetAddr, from: NetAddr, to: NetAddr): NetAddr {
   const df = depthOf(from);
   const dt = depthOf(to);
   const rest = digitsOf(a).slice(df);

@@ -6,6 +6,8 @@ import { useStore } from '../../state/store';
 import { BulkAddDialog } from './BulkAddDialog';
 import { CommitInput } from './CommitInput';
 import { DeviceFields } from './DeviceFields';
+import { DuplicateDialog } from './DuplicateDialog';
+import { OutlineDialog } from './OutlineDialog';
 
 export function NodeDetails({ node }: { node: TreeNode }) {
   const { apply, select } = useStore.getState();
@@ -13,6 +15,8 @@ export function NodeDetails({ node }: { node: TreeNode }) {
   const allIssues = useStore((s) => s.issues);
   const issues = useMemo(() => allIssues.filter((i) => i.addr === node.addr), [allIssues, node.addr]);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [outlineOpen, setOutlineOpen] = useState(false);
+  const [dupOpen, setDupOpen] = useState(false);
   const isRoot = node.addr === ROOT;
   const canHaveChildren = depthOf(node.addr) < MAX_DEPTH;
   const subtreeSize = countSubtree(node);
@@ -84,8 +88,10 @@ export function NodeDetails({ node }: { node: TreeNode }) {
       <div className="button-row">
         {canHaveChildren && <button onClick={onAddChild}>+ Child</button>}
         {canHaveChildren && <button onClick={() => setBulkOpen(true)}>+ Several children…</button>}
+        {canHaveChildren && <button onClick={() => setOutlineOpen(true)} title="Paste a tree from Excel or type an indented outline">Paste outline…</button>}
         {!isRoot && (
           <>
+            <button onClick={() => setDupOpen(true)} title="Copy this net, everything under it and its devices, with shifted IPs">Duplicate…</button>
             <button onClick={() => onShift(-1)} title="Move up one slot (swaps with the sibling there)">↑</button>
             <button onClick={() => onShift(1)} title="Move down one slot (swaps with the sibling there)">↓</button>
             <button className="danger" onClick={onDelete}>Delete</button>
@@ -121,6 +127,8 @@ export function NodeDetails({ node }: { node: TreeNode }) {
       )}
 
       {bulkOpen && <BulkAddDialog parent={node.addr} parentName={labelOf(node)} onClose={() => setBulkOpen(false)} />}
+      {outlineOpen && <OutlineDialog parent={node.addr} parentName={labelOf(node)} onClose={() => setOutlineOpen(false)} />}
+      {dupOpen && <DuplicateDialog src={node.addr} srcName={labelOf(node)} onClose={() => setDupOpen(false)} />}
     </div>
   );
 }
