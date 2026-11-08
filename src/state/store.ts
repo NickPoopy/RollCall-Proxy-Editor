@@ -43,6 +43,8 @@ export interface AppState extends Derived {
   /** Apply a model edit from the editor pane. Returns false if it was refused. */
   apply: (fn: (doc: ProxyDoc) => ProxyDoc) => boolean;
   select: (addr: NetAddr | null, origin: Origin) => void;
+  /** Rewrite IpShare0..N in order with no gaps. Returns true if anything changed. */
+  renumberIpShares: () => boolean;
   undo: () => void;
   redo: () => void;
   markSaved: (meta: { fileName?: string; fileHandle?: FileSystemFileHandle | null }) => void;
@@ -148,6 +150,13 @@ export const useStore = create<AppState>((set, get) => ({
       lastPushAt: 0,
     });
     return true;
+  },
+
+  renumberIpShares: () => {
+    const s = get();
+    if (!s.issues.some((i) => i.code === 'ipshare-numbering')) return false;
+    // Serializing always writes IpShare0..N in order, so a no-op edit renumbers.
+    return s.apply((d) => ({ ...d }));
   },
 
   select: (addr, origin) => {

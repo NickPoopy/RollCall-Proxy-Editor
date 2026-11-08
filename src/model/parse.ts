@@ -55,6 +55,7 @@ export function parse(text: string): ParseResult {
   doc.sections.push(current);
   let hasNetPlaceholder = false;
   let hasSharePlaceholder = false;
+  const misnumbered: { line: number; found: number; expected: number }[] = [];
 
   lines.forEach((line, i) => {
     const sec = SECTION_RE.exec(line);
@@ -111,6 +112,8 @@ export function parse(text: string): ParseResult {
         current.entries.push({ type: 'ipshares' });
         hasSharePlaceholder = true;
       }
+      const n = Number(/\d+/.exec(key)![0]);
+      if (n !== doc.ipShares.length) misnumbered.push({ line: i, found: n, expected: doc.ipShares.length });
       lineIndex.ipShares.push(i);
       doc.ipShares.push(share);
       return;
@@ -118,6 +121,18 @@ export function parse(text: string): ParseResult {
 
     current.entries.push({ type: 'kv', key, value });
   });
+
+  // RollCall needs IpShare0, IpShare1, IpShare2… in order with no gaps. One warning for the first break.
+  if (misnumbered.length > 0) {
+    const m = misnumbered[0];
+    const more = misnumbered.length > 1 ? ` (${misnumbered.length} lines are out of sequence)` : '';
+    diagnostics.push({
+      severity: 'warning',
+      code: 'ipshare-numbering',
+      line: m.line,
+      message: `IpShare numbers must run 0, 1, 2… with no gaps or repeats, or RollCall won't load the file. This line is IpShare${m.found} but should be IpShare${m.expected}${more}. Use Renumber to fix it.`,
+    });
+  }
 
   // Give existing-but-empty sections a placeholder so new entries land there.
   for (const s of doc.sections) {

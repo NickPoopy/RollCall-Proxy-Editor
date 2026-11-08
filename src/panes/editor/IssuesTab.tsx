@@ -25,6 +25,17 @@ export function IssuesTab({ onShowTree }: { onShowTree: () => void }) {
         >
           <span className="issue-icon" aria-label={d.severity}>{ICON[d.severity]}</span>
           <span>{d.message}</span>
+          {d.code === 'ipshare-numbering' && (
+            <button
+              className="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                useStore.getState().renumberIpShares();
+              }}
+            >
+              Renumber
+            </button>
+          )}
           {d.line !== undefined && <span className="muted mono small">line {d.line + 1}</span>}
         </li>
       ))}

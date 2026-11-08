@@ -92,6 +92,8 @@ input[type='checkbox'] { width: auto; }
 .pane-footer { padding: 4px 10px; font-size: 11px; border-top: 1px solid var(--border); }
 .badge { font-size: 11px; padding: 1px 7px; border-radius: 9px; }
 .badge-error { background: #4a1f23; color: var(--danger); cursor: help; }
+.badge-warning { background: #4a3b14; color: var(--warning); display: inline-flex; gap: 8px; align-items: center; padding: 2px 4px 2px 9px; }
+.badge-warning button { color: var(--text); }
 
 .cm-host { overflow: hidden; }
 .cm-host > div { height: 100%; }

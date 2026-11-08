@@ -31,6 +31,7 @@ Click a net in any pane and it's highlighted in the other two.
 - **Outlines**: the Toolbox also takes an indented outline or a paste from Excel (see below). **Copy branch as outline** exports a branch the same way, so you can edit it in Excel and paste it back.
 - **Devices table**: edit every `IpShare` line in one grid, with filtering.
 - **Settings**: edit the other sections (`[Combiner Services]`, `[MonitoringToLogServer]`, …) as key/value pairs.
+- **IpShare numbering**: RollCall needs `IpShare0, 1, 2…` in order with no gaps or repeats. Every edit made through the editor rewrites them in sequence automatically. Gaps from hand-editing the raw text are flagged with a **Renumber** button, and Save always renumbers first.
 - **Validation**: duplicate addresses, unnamed parents, bad IPs/ports, more than 15 children, duplicate IP:port.
 - **Undo / redo**, plus a draft autosave in the browser so a closed tab doesn't lose work.
 - Everything runs locally in your browser. Files are never uploaded anywhere.

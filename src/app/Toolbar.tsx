@@ -13,12 +13,14 @@ export function useFileActions() {
   }, []);
 
   const save = useCallback(async (as: boolean) => {
+    // Never save a file with IpShare gaps; RollCall won't load it.
+    const renumbered = useStore.getState().renumberIpShares();
     const s = useStore.getState();
     try {
       const r = await saveFile(s.text, s.encoding, s.fileName, as ? null : s.fileHandle);
       if (r) {
         s.markSaved(r);
-        s.showToast(`Saved ${r.fileName}`, 'info');
+        s.showToast(renumbered ? `Renumbered IpShares to 0–${s.doc.ipShares.length - 1} and saved ${r.fileName}` : `Saved ${r.fileName}`, 'info');
       }
     } catch (e) {
       s.showToast(`Could not save: ${(e as Error).message}`);

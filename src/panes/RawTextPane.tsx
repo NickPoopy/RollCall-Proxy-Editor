@@ -62,6 +62,7 @@ export function RawTextPane() {
   const selectOrigin = useStore((s) => s.selectOrigin);
   const lineIndex = useStore((s) => s.lineIndex);
   const parseErrors = useStore((s) => s.parseErrors);
+  const numbering = useStore((s) => s.issues.find((i) => i.code === 'ipshare-numbering'));
   const ref = useRef<ReactCodeMirrorRef>(null);
   const editorText = useMemo(() => text.replace(/\r\n/g, '\n'), [text]);
 
@@ -111,6 +112,12 @@ export function RawTextPane() {
         {parseErrors.length > 0 && (
           <span className="badge badge-error" title={parseErrors.map((e) => `Line ${(e.line ?? 0) + 1}: ${e.message}`).join('\n')}>
             {parseErrors.length} error{parseErrors.length > 1 ? 's' : ''}
+          </span>
+        )}
+        {numbering && parseErrors.length === 0 && (
+          <span className="badge badge-warning" title={numbering.message}>
+            IpShare numbers out of sequence
+            <button className="small" onClick={() => useStore.getState().renumberIpShares()}>Renumber</button>
           </span>
         )}
       </div>

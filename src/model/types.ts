@@ -59,6 +59,8 @@ export interface Diagnostic {
   line?: number;
   addr?: NetAddr;
   ipShareIndex?: number;
+  /** Machine-readable kind, for issues that have a quick fix. */
+  code?: 'ipshare-numbering';
 }
 
 /** Where things live in the text, for jump-to-line and lint markers. */
