@@ -1,6 +1,6 @@
-First usable alpha of RollCall Proxy Editor.
+First official release of RollCall Proxy Editor: a three-pane editor that makes RollCall proxy files easier to read, edit and build.
 
-**Use it:** https://nickpoopy.github.io/RollCall-Proxy-Editor/, or download the attached `.html` and open it in Chrome or Edge (works offline).
+**Use it:** https://nickpoopy.github.io/RollCall-Proxy-Editor/, or download the attached `.html` and open it in Chrome or Edge. It works offline, with nothing to install.
 
 ### What's in it
 - Three synced panes: raw text, friendly editor, RollCall tree preview
@@ -22,3 +22,4 @@ First usable alpha of RollCall Proxy Editor.
 ### Known limitations
 - The preview can't show real device names or versions (those come from the device), so it shows `Device @ <ip>` placeholders.
 - The three IpShare address slots are labelled Address 1/2/3 until their exact meaning is confirmed.
+- Saved prefabs, IP schemes (/30, /31) and the theme are stored in your browser. Export prefabs to a `.json` file to move them between computers or share them.
