@@ -9,11 +9,13 @@ const TYPES: [ParamType, string][] = [
   ['text', 'Text'],
   ['ip', 'IP address'],
   ['bool', 'Yes/No'],
+  ['scheme', 'IP scheme'],
 ];
 
 function coerce(type: ParamType, v: string): PrefabParam['default'] {
   if (type === 'int') return Number(v) || 0;
   if (type === 'bool') return v === 'true';
+  if (type === 'scheme') return ['flat', '/31', '/30'].includes(v) ? v : 'flat';
   return v;
 }
 
@@ -90,7 +92,13 @@ export function PrefabEditor({ initial, onClose, onSaved }: { initial: Prefab; o
                   </select>
                 </td>
                 <td>
-                  {p.type === 'bool' ? (
+                  {p.type === 'scheme' ? (
+                    <select value={String(p.default)} onChange={(e) => setParam(i, { default: e.target.value })} aria-label="Default">
+                      <option value="flat">flat</option>
+                      <option value="/31">/31</option>
+                      <option value="/30">/30</option>
+                    </select>
+                  ) : p.type === 'bool' ? (
                     <input type="checkbox" checked={Boolean(p.default)} onChange={(e) => setParam(i, { default: e.target.checked })} aria-label="Default" />
                   ) : (
                     <input className="mono" value={String(p.default)} onChange={(e) => setParam(i, { default: coerce(p.type, e.target.value) })} aria-label="Default" />
@@ -110,7 +118,7 @@ export function PrefabEditor({ initial, onClose, onSaved }: { initial: Prefab; o
               Same as an outline, plus <span className="mono">{'{{expr}}'}</span> to insert settings,{' '}
               <span className="mono">@repeat i 1..count</span> … <span className="mono">@end</span> to repeat lines, and{' '}
               <span className="mono">@if expr</span> … <span className="mono">@end</span>. Functions: <span className="mono">pad(n, 2)</span>,{' '}
-              <span className="mono">hex(n)</span>, <span className="mono">ip(base, offset)</span>. <span className="mono">[3] Name</span> pins a net to slot 3.
+              <span className="mono">hex(n)</span>, <span className="mono">ip(base, offset)</span>, <span className="mono">addr(base, i, scheme)</span> (i-th device; /30 and /31 step by subnet). <span className="mono">[3] Name</span> pins a net to slot 3.
             </div>
           </div>
           <div>

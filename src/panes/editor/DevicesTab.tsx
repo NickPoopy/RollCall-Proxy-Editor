@@ -5,7 +5,7 @@ import { labelOf, type Tree } from '../../model/tree';
 import type { IpShare } from '../../model/types';
 import { useStore } from '../../state/store';
 import { CommitInput } from './CommitInput';
-import { checkIp, checkPort } from './DeviceFields';
+import { checkIp, checkPort, normaliseIp } from './DeviceFields';
 
 type Key = 'ip1' | 'port1' | 'ip2' | 'port2' | 'ip3' | 'port3';
 
@@ -28,7 +28,7 @@ export function DevicesTab({ tree }: { tree: Tree }) {
       className={k.startsWith('ip') ? 'ip' : 'port'}
       value={s[k]}
       check={k.startsWith('ip') ? checkIp(k !== 'ip1') : checkPort}
-      onCommit={(v) => set(i, { [k]: v.trim() || (k.startsWith('ip') && k !== 'ip1' ? '-' : v) })}
+      onCommit={(v) => set(i, { [k]: k.startsWith('ip') ? normaliseIp(v, k !== 'ip1') : v.trim() })}
       aria-label={`IpShare${i} ${k}`}
     />
   );

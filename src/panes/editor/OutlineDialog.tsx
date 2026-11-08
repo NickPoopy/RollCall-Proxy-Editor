@@ -6,6 +6,7 @@ import { BUILTIN_PREFABS, checkParam, defaultValues, renderPrefab, type Prefab, 
 import { TemplateError, type Value, type Vars } from '../../model/template';
 import type { NetAddr } from '../../model/types';
 import { downloadText, usePrefabs } from '../../state/prefabs';
+import { SCHEME_LABEL, SCHEMES, type Scheme } from '../../model/ipscheme';
 import { useStore } from '../../state/store';
 import { PrefabEditor } from './PrefabEditor';
 
@@ -21,6 +22,21 @@ Kahuna
 function ParamField({ p, value, onChange }: { p: PrefabParam; value: Value; onChange: (v: Value) => void }) {
   const err = checkParam(p, value);
   const id = `pf-${p.key}`;
+  if (p.type === 'scheme') {
+    return (
+      <div className="pf-row">
+        <label htmlFor={id}>{p.label}</label>
+        <select id={id} value={String(value)} onChange={(e) => onChange(e.target.value)} title={p.hint}>
+          {SCHEMES.map((s) => (
+            <option key={s} value={s}>
+              {SCHEME_LABEL[s]}
+            </option>
+          ))}
+        </select>
+        {p.hint && <div className="hint">{p.hint}</div>}
+      </div>
+    );
+  }
   if (p.type === 'bool') {
     return (
       <label className="checkbox pf-row" title={p.hint}>
@@ -47,7 +63,7 @@ function ParamField({ p, value, onChange }: { p: PrefabParam; value: Value; onCh
   );
 }
 
-export function OutlineDialog({ parent, parentName, onClose }: { parent: NetAddr; parentName: string; onClose: () => void }) {
+export function OutlineDialog({ parent, parentName, scheme, onClose }: { parent: NetAddr; parentName: string; scheme: Scheme; onClose: () => void }) {
   const doc = useStore((s) => s.doc);
   const custom = usePrefabs((s) => s.custom);
   const [text, setText] = useState('');
@@ -78,6 +94,8 @@ export function OutlineDialog({ parent, parentName, onClose }: { parent: NetAddr
   const choose = (p: Prefab) => {
     if (handEdited && !window.confirm('Replace your hand-edited outline with this prefab?')) return;
     const vals = defaultValues(p);
+    // Scheme settings start from the branch's IP scheme.
+    for (const param of p.params) if (param.type === 'scheme') vals[param.key] = scheme;
     setPrefab(p);
     setValues(vals);
     regenerate(p, vals);

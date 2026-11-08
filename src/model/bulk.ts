@@ -3,6 +3,7 @@ import { addChild, addIpShare, formatPattern, insertNetName, OpError, rebaseAddr
 import { buildTree, type TreeNode } from './tree';
 import type { IpShare, NetAddr, NetName, ProxyDoc } from './types';
 import { isValidIp, isValidPort } from './validate';
+import { intToIp, ipToInt, resolveCidr, type Scheme } from './ipscheme';
 
 // =====================================================================
 // Duplicate a subtree N times
@@ -19,8 +20,23 @@ export interface CloneOptions {
   /** Number used for {n} in the first copy. */
   startNumber: number;
   renameRules: RenameRule[];
-  /** Added to the chosen octet of every device address, times the copy index (1, 2, 3…). */
-  ip: { octet: 3 | 4; step: number };
+  /**
+   * How device IPs move per copy (times the copy index 1, 2, 3…):
+   * - octet: add `step` to octet 3 or 4 (no carry)
+   * - devices: move `step` whole subnets of the scheme (carries across octets); for flat that's `step` addresses
+   */
+  ip: { octet: 3 | 4; step: number; scheme?: undefined } | { scheme: Scheme; step: number; octet?: undefined };
+}
+
+const SCHEME_SIZE: Record<Scheme, number> = { flat: 1, '/31': 2, '/30': 4 };
+
+function shiftBySubnets(ip: string, subnets: number, scheme: Scheme): string {
+  if (ip === '-' || subnets === 0) return ip;
+  const v = ipToInt(ip);
+  if (v === null) return ip;
+  const next = v + subnets * SCHEME_SIZE[scheme];
+  if (next < 0 || next > 0xffffffff) throw new OpError(`Shifting ${ip} runs past the end of the IP range`);
+  return intToIp(next);
 }
 
 export interface CloneResult {
@@ -90,14 +106,16 @@ export function cloneSubtree(doc: ProxyDoc, src: NetAddr, opts: CloneOptions): C
   targets.forEach((root, k) => {
     const n = opts.startNumber + k;
     const delta = (k + 1) * opts.ip.step;
+    const ipOpts = opts.ip;
+    const shift = (ip: string) => (ipOpts.scheme ? shiftBySubnets(ip, delta, ipOpts.scheme) : shiftOctet(ip, ipOpts.octet, delta));
     const names = srcNames.map((x) => ({ addr: rebaseAddr(x.addr, src, root), name: applyRenameRules(x.name, opts.renameRules, n) }));
     const shares = srcShares.map((s) => ({
       ...s,
       extra: [...s.extra],
       net: rebaseAddr(s.net, src, root),
-      ip1: shiftOctet(s.ip1, opts.ip.octet, delta),
-      ip2: shiftOctet(s.ip2, opts.ip.octet, delta),
-      ip3: shiftOctet(s.ip3, opts.ip.octet, delta),
+      ip1: shift(s.ip1),
+      ip2: shift(s.ip2),
+      ip3: shift(s.ip3),
     }));
     newNames.push(...names);
     newShares.push(...shares);
@@ -146,15 +164,19 @@ export interface OutlineError {
   message: string;
 }
 
-const IP_PORT_RE = /^(\d{1,3}(?:\.\d{1,3}){3})(?::(\d{1,5}))?$/;
+const IP_PORT_RE = /^(\d{1,3}(?:\.\d{1,3}){3}(?:\/\d{1,2})?)(?::(\d{1,5}))?$/;
 
 function parseAddrCell(cell: string): OutlineAddr | null | string {
   const c = cell.trim();
   if (c === '' || c === '-') return null;
   const m = IP_PORT_RE.exec(c);
-  if (!m || !isValidIp(m[1])) return `"${c}" is not a valid IP address`;
+  if (!m) return `"${c}" is not a valid IP address`;
+  // "10.20.0.8/30" means "the device address in that subnet".
+  const ip = resolveCidr(m[1]);
+  if (typeof ip !== 'string') return ip.error;
+  if (!isValidIp(ip)) return `"${c}" is not a valid IP address`;
   if (m[2] !== undefined && !isValidPort(m[2])) return `"${m[2]}" is not a valid port`;
-  return { ip: m[1], port: m[2] };
+  return { ip, port: m[2] };
 }
 
 /** Split a line body into its name and up to three address cells. */

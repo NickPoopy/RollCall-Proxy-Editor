@@ -1,19 +1,26 @@
 import { useState } from 'react';
 import { childAddr, depthOf, inSubtree, MAX_DEPTH } from '../../model/address';
-import { bulkAddChildren, formatPattern, incrementIp } from '../../model/ops';
+import { bulkAddChildren, formatPattern } from '../../model/ops';
 import { isValidIp, isValidPort } from '../../model/validate';
+import { nthDevice, resolveCidr, SCHEME_LABEL, SCHEMES, suggestDevice, type Scheme } from '../../model/ipscheme';
 import type { NetAddr } from '../../model/types';
 import { useStore } from '../../state/store';
 
-export function BulkAddDialog({ parent, parentName, onClose }: { parent: NetAddr; parentName: string; onClose: () => void }) {
+export function BulkAddDialog({ parent, parentName, scheme: branchScheme, onClose }: { parent: NetAddr; parentName: string; scheme: Scheme; onClose: () => void }) {
   const doc = useStore((s) => s.doc);
+  // Start where the branch's existing devices leave off, if there are any.
+  const [initial] = useState(() => {
+    const probe = childAddr(parent, 1);
+    return (probe && suggestDevice(doc, probe, branchScheme)) || null;
+  });
   const [count, setCount] = useState(4);
   const [pattern, setPattern] = useState('Item {n:2}');
   const [start, setStart] = useState(1);
   const [withDevice, setWithDevice] = useState(true);
-  const [ip1, setIp1] = useState('10.0.0.10');
-  const [ip2, setIp2] = useState('-');
-  const [ip3, setIp3] = useState('-');
+  const [scheme, setScheme] = useState<Scheme>(branchScheme);
+  const [ip1, setIp1] = useState(initial?.ip1 ?? (branchScheme === '/30' ? '10.0.0.2' : branchScheme === '/31' ? '10.0.0.1' : '10.0.0.10'));
+  const [ip2, setIp2] = useState(initial?.ip2 ?? '-');
+  const [ip3, setIp3] = useState(initial?.ip3 ?? '-');
   const [port, setPort] = useState('2050');
   const [step, setStep] = useState(1);
 
@@ -26,21 +33,28 @@ export function BulkAddDialog({ parent, parentName, onClose }: { parent: NetAddr
     }
   }
 
-  const ipOk = (v: string, opt: boolean) => (opt && v === '-') || isValidIp(v);
+  const resolve = (v: string) => {
+    const r = resolveCidr(v);
+    return typeof r === 'string' ? r : '';
+  };
+  const ipOk = (v: string, opt: boolean) => (opt && (v === '-' || v === '')) || isValidIp(resolve(v));
   const errors: string[] = [];
   if (!(count >= 1)) errors.push('Count must be at least 1.');
   if (count > free.length) errors.push(`Only ${free.length} free slot(s) under ${parent}. A net can have at most 15 children.`);
   if (withDevice) {
-    if (!ipOk(ip1, false)) errors.push('Address 1 must be an IPv4 address.');
-    if (!ipOk(ip2, true) || !ipOk(ip3, true)) errors.push('Addresses 2 and 3 must be IPv4 addresses or "-".');
+    if (!ipOk(ip1, false)) errors.push('Address 1 must be an IPv4 address or a /30, /31 subnet.');
+    if (!ipOk(ip2, true) || !ipOk(ip3, true)) errors.push('Addresses 2 and 3 must be IPv4 addresses, subnets, or "-".');
+    if (!(step >= 1)) errors.push('Step must be at least 1.');
     if (!isValidPort(port)) errors.push('Port must be 1–65535.');
   }
 
   const previewRows = free.slice(0, Math.max(0, Math.min(count, free.length))).map((a, k) => ({
     addr: a,
     name: formatPattern(pattern, start + k, parseInt(a[depthOf(parent)], 16)),
-    ip: withDevice ? incrementIp(ip1, k * step) : '',
+    ip: withDevice && errors.length === 0 ? nthDevice(ip1, k * step, scheme) : '',
+    ip2: withDevice && errors.length === 0 ? nthDevice(ip2 || '-', k * step, scheme) : '',
   }));
+  const showIp2 = withDevice && ip2 !== '-' && ip2 !== '';
 
   const submit = () => {
     if (errors.length) return;
@@ -50,7 +64,9 @@ export function BulkAddDialog({ parent, parentName, onClose }: { parent: NetAddr
           count,
           namePattern: pattern,
           startNumber: start,
-          device: withDevice ? { ip1, port1: port, ip2, port2: port, ip3, port3: port, step } : undefined,
+          device: withDevice
+            ? { ip1: resolve(ip1), port1: port, ip2: ip2 ? resolve(ip2) || '-' : '-', port2: port, ip3: ip3 ? resolve(ip3) || '-' : '-', port3: port, step, scheme }
+            : undefined,
         }).doc,
     );
     if (ok) onClose();
@@ -77,6 +93,18 @@ export function BulkAddDialog({ parent, parentName, onClose }: { parent: NetAddr
           </label>
           {withDevice && (
             <>
+              <label htmlFor="b-scheme">IP scheme</label>
+              <div>
+                <select id="b-scheme" value={scheme} onChange={(e) => setScheme(e.target.value as Scheme)}>
+                  {SCHEMES.map((s) => (
+                    <option key={s} value={s}>
+                      {SCHEME_LABEL[s]}
+                      {s === branchScheme ? ' (this branch)' : ''}
+                    </option>
+                  ))}
+                </select>
+                {scheme !== 'flat' && <div className="hint">Each new net gets the next {scheme}. You can type a subnet, e.g. 10.20.0.8{scheme}.</div>}
+              </div>
               <label htmlFor="b-ip1">Address 1 (first)</label>
               <input id="b-ip1" className="mono" value={ip1} onChange={(e) => setIp1(e.target.value.trim())} />
               <label htmlFor="b-ip2">Address 2 (first)</label>
@@ -85,10 +113,14 @@ export function BulkAddDialog({ parent, parentName, onClose }: { parent: NetAddr
               <input id="b-ip3" className="mono" value={ip3} onChange={(e) => setIp3(e.target.value.trim())} />
               <label htmlFor="b-port">Port (all)</label>
               <input id="b-port" className="mono" value={port} onChange={(e) => setPort(e.target.value.trim())} />
-              <label htmlFor="b-step">IP step</label>
+              <label htmlFor="b-step">{scheme === 'flat' ? 'IP step' : 'Subnets per net'}</label>
               <div>
-                <input id="b-step" type="number" value={step} onChange={(e) => setStep(Number(e.target.value))} />
-                <div className="hint">Added to the last octet of each address for every new net</div>
+                <input id="b-step" type="number" min={1} value={step} onChange={(e) => setStep(Number(e.target.value))} />
+                <div className="hint">
+                  {scheme === 'flat'
+                    ? 'Addresses to move on for each new net'
+                    : `Whole ${scheme} subnets to move on for each new net (1 = back to back)`}
+                </div>
               </div>
             </>
           )}
@@ -100,6 +132,7 @@ export function BulkAddDialog({ parent, parentName, onClose }: { parent: NetAddr
                 <th>Net</th>
                 <th>Name</th>
                 {withDevice && <th>Address 1</th>}
+                {showIp2 && <th>Address 2</th>}
               </tr>
             </thead>
             <tbody>
@@ -108,6 +141,7 @@ export function BulkAddDialog({ parent, parentName, onClose }: { parent: NetAddr
                   <td className="mono">{r.addr}</td>
                   <td>{r.name}</td>
                   {withDevice && <td className="mono">{r.ip}</td>}
+                  {showIp2 && <td className="mono">{r.ip2}</td>}
                 </tr>
               ))}
             </tbody>

@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 import { sortNetNames } from '../model/ops';
 import { openFile, saveFile } from '../state/files';
 import { useStore } from '../state/store';
+import { useSchemes } from '../state/schemes';
 import { EXAMPLE_TEXT, NEW_TEMPLATE } from '../state/templates';
 
 const REPO_URL = 'https://github.com/NickPoopy/RollCall-Proxy-Editor';
@@ -19,6 +20,8 @@ export function useFileActions() {
     try {
       const r = await saveFile(s.text, s.encoding, s.fileName, as ? null : s.fileHandle);
       if (r) {
+        // IP schemes are kept per file name; carry them over on Save as.
+        useSchemes.getState().rename(s.fileName, r.fileName);
         s.markSaved(r);
         s.showToast(renumbered ? `Renumbered IpShares to 0–${s.doc.ipShares.length - 1} and saved ${r.fileName}` : `Saved ${r.fileName}`, 'info');
       }

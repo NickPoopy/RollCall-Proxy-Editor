@@ -31,6 +31,11 @@ Click a net in any pane and it's highlighted in the other two.
 - **Outlines**: the Toolbox also takes an indented outline or a paste from Excel (see below). **Copy branch as outline** exports a branch the same way, so you can edit it in Excel and paste it back.
 - **Devices table**: edit every `IpShare` line in one grid, with filtering.
 - **Settings**: edit the other sections (`[Combiner Services]`, `[MonitoringToLogServer]`, …) as key/value pairs.
+- **Layer 3 (/30, /31) addressing**: set an **IP scheme** on any branch (Flat, /31 = device on the odd address, /30 = device on .2). It's inherited by everything below and marked with a badge in the tree.
+  - In L3 branches, bulk add, Duplicate, the Toolbox prefabs and **+ Add device** step by whole subnets (.2, .6, .10… for /30), carrying across /24 boundaries. Address 2/3 follow in parallel.
+  - IP fields accept a subnet like `10.20.0.8/30` and fill in the device address.
+  - The Issues tab flags devices on a network, broadcast or switch-side address, and two devices sharing a subnet.
+  - Schemes are an editor setting saved in your browser per file name. The proxy file itself only ever contains plain IPs.
 - **IpShare numbering**: RollCall needs `IpShare0, 1, 2…` in order with no gaps or repeats. Every edit made through the editor rewrites them in sequence automatically. Gaps from hand-editing the raw text are flagged with a **Renumber** button, and Save always renumbers first.
 - **Validation**: duplicate addresses, unnamed parents, bad IPs/ports, more than 15 children, duplicate IP:port.
 - **Undo / redo**, plus a draft autosave in the browser so a closed tab doesn't lose work.

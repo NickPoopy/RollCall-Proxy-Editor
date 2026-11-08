@@ -1,6 +1,7 @@
 import { depthOf, MAX_CHILDREN, ROOT, skipsLevel } from './address';
 import { buildTree } from './tree';
 import type { Diagnostic, LineIndex, ProxyDoc } from './types';
+import { hostProblem, schemeFor, subnetOf, type SchemeMap } from './ipscheme';
 
 const IPV4_RE = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
 
@@ -15,7 +16,7 @@ export function isValidPort(s: string): boolean {
 }
 
 /** Checks the model for things RollCall is likely to choke on or that are probably mistakes. */
-export function validate(doc: ProxyDoc, lineIndex?: LineIndex): Diagnostic[] {
+export function validate(doc: ProxyDoc, lineIndex?: LineIndex, schemes: SchemeMap = {}): Diagnostic[] {
   const out: Diagnostic[] = [];
   const netLine = (addr: string, nth = 0) => lineIndex?.netNames.get(addr)?.[nth];
   const shareLine = (i: number) => lineIndex?.ipShares[i];
@@ -95,6 +96,26 @@ export function validate(doc: ProxyDoc, lineIndex?: LineIndex): Diagnostic[] {
     } else {
       endpoints.set(key, i);
     }
+  });
+
+  // Layer 3 point-to-point checks, for branches set to /30 or /31.
+  const subnets = new Map<string, { i: number; ip: string }>();
+  doc.ipShares.forEach((s, i) => {
+    const scheme = schemeFor(schemes, s.net);
+    if (scheme === 'flat') return;
+    const base = { ipShareIndex: i, addr: s.net, line: shareLine(i) };
+    [s.ip1, s.ip2, s.ip3].forEach((ip, slot) => {
+      if (!isValidIp(ip)) return;
+      const problem = hostProblem(ip, scheme);
+      if (problem) out.push({ ...base, severity: 'warning', message: `IpShare${i}: Address ${slot + 1}: ${problem}` });
+      const key = `${slot}|${subnetOf(ip, scheme)}`;
+      const prev = subnets.get(key);
+      if (prev && prev.ip !== ip) {
+        out.push({ ...base, severity: 'warning', message: `IpShare${i}: ${ip} is in the same ${scheme} as IpShare${prev.i} (${prev.ip}): ${subnetOf(ip, scheme)}` });
+      } else if (!prev) {
+        subnets.set(key, { i, ip });
+      }
+    });
   });
 
   return out;

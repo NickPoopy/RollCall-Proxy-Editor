@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
-import { childDigit, depthOf, displayAddr, isValidAddr, MAX_DEPTH, ROOT } from '../../model/address';
-import { addChild, addIpShare, moveSubtree, removeIpShare, removeSubtree, setNetName, shiftNet, updateIpShare } from '../../model/ops';
+import { childDigit, depthOf, displayAddr, inSubtree, isValidAddr, MAX_DEPTH, ROOT } from '../../model/address';
+import { addChild, addIpShare, moveSubtree, rebaseAddr, removeIpShare, removeSubtree, setNetName, shiftNet, updateIpShare } from '../../model/ops';
+import { SCHEME_LABEL, SCHEMES, schemeFor, schemeSource, suggestDevice, type Scheme } from '../../model/ipscheme';
+import { useFileSchemes, useSchemes } from '../../state/schemes';
 import { labelOf, type TreeNode } from '../../model/tree';
 import { useStore } from '../../state/store';
 import { BulkAddDialog } from './BulkAddDialog';
@@ -23,6 +25,18 @@ export function NodeDetails({ node }: { node: TreeNode }) {
   const isRoot = node.addr === ROOT;
   const canHaveChildren = depthOf(node.addr) < MAX_DEPTH;
   const subtreeSize = countSubtree(node);
+  const fileName = useStore((s) => s.fileName);
+  const netNames = useStore((s) => s.doc.netNames);
+  const schemes = useFileSchemes(fileName);
+  const scheme = schemeFor(schemes, node.addr);
+  const explicit = schemes[node.addr] ?? '';
+  const source = schemeSource(schemes, node.addr);
+  const sourceName = source ? (netNames.find((n) => n.addr === source)?.name ?? source) : '';
+
+  const onAddDevice = () => {
+    const doc = useStore.getState().doc;
+    apply((d) => addIpShare(d, node.addr, suggestDevice(doc, node.addr, scheme) ?? {}));
+  };
 
   const onAddChild = () => {
     let added: string | null = null;
@@ -80,13 +94,39 @@ export function NodeDetails({ node }: { node: TreeNode }) {
             check={(v) => (isValidAddr(v.trim()) ? null : 'Must be 4 hex digits, e.g. 1210')}
             onCommit={(v) => {
               const to = v.trim().toUpperCase();
-              if (isValidAddr(to) && apply((d) => moveSubtree(d, node.addr, to))) select(to, 'editor');
+              if (isValidAddr(to) && apply((d) => moveSubtree(d, node.addr, to))) {
+                const from = node.addr;
+                useSchemes.getState().remap(fileName, (a) => (inSubtree(a, from) ? rebaseAddr(a, from, to) : a));
+                select(to, 'editor');
+              }
             }}
             title="Change to move this net and everything under it"
           />
           <span className="hint">Changing this moves the net and everything under it.</span>
         </div>
       )}
+
+      <div className="field">
+        <label htmlFor="nd-scheme">IP scheme</label>
+        <select
+          id="nd-scheme"
+          value={explicit}
+          onChange={(e) => useSchemes.getState().set(fileName, node.addr, (e.target.value || null) as Scheme | null)}
+        >
+          <option value="">
+            {source && source !== node.addr ? `Inherit: ${scheme} from “${sourceName}”` : isRoot ? 'Default: flat' : `Inherit: ${scheme}`}
+          </option>
+          {SCHEMES.map((s) => (
+            <option key={s} value={s}>
+              {SCHEME_LABEL[s]}
+            </option>
+          ))}
+        </select>
+        <span className="hint">
+          {scheme === 'flat' ? 'Devices step by one address.' : `Each device gets its own ${scheme}: tools step by whole subnets, and Issues checks host positions.`}
+          {isRoot ? ' Applies to the whole file unless a branch overrides it.' : ' Applies to everything under this net.'}
+        </span>
+      </div>
 
       <div className="button-row">
         {canHaveChildren && <button onClick={onAddChild}>+ Child</button>}
@@ -99,7 +139,7 @@ export function NodeDetails({ node }: { node: TreeNode }) {
         {!isRoot && (
           <>
             <button onClick={() => setDupOpen(true)} title="Copy this net, everything under it and its devices, with shifted IPs">Duplicate…</button>
-            <button onClick={() => setPrefabDraft(prefabFromBranch(useStore.getState().doc, node.addr))} title="Save this branch as a reusable prefab in the Toolbox">
+            <button onClick={() => setPrefabDraft(prefabFromBranch(useStore.getState().doc, node.addr, '2050', scheme))} title="Save this branch as a reusable prefab in the Toolbox">
               Save as prefab…
             </button>
             <button onClick={() => onShift(-1)} title="Move up one slot (swaps with the sibling there)">↑</button>
@@ -113,7 +153,7 @@ export function NodeDetails({ node }: { node: TreeNode }) {
         <div className="details-section">
           <div className="section-title">
             Devices (IpShare)
-            <button className="small" onClick={() => apply((d) => addIpShare(d, node.addr))}>+ Add device</button>
+            <button className="small" onClick={onAddDevice} title="Suggests the next free address in this branch">+ Add device</button>
           </div>
           {node.devices.length === 0 && <p className="muted small">No device attached. Leaf nets usually get one IpShare that points at the device's IP.</p>}
           {node.devices.map((i) => (
@@ -122,7 +162,7 @@ export function NodeDetails({ node }: { node: TreeNode }) {
                 <span className="mono small muted">IpShare{i}</span>
                 <button className="small danger" onClick={() => apply((d) => removeIpShare(d, i))}>Remove</button>
               </div>
-              <DeviceFields share={shares[i]} onChange={(k, v) => apply((d) => updateIpShare(d, i, { [k]: v }))} />
+              <DeviceFields share={shares[i]} scheme={scheme} onChange={(k, v) => apply((d) => updateIpShare(d, i, { [k]: v }))} />
             </div>
           ))}
         </div>
@@ -136,9 +176,11 @@ export function NodeDetails({ node }: { node: TreeNode }) {
         </ul>
       )}
 
-      {bulkOpen && <BulkAddDialog parent={node.addr} parentName={labelOf(node)} onClose={() => setBulkOpen(false)} />}
-      {outlineOpen && <OutlineDialog parent={node.addr} parentName={labelOf(node)} onClose={() => setOutlineOpen(false)} />}
-      {dupOpen && <DuplicateDialog src={node.addr} srcName={labelOf(node)} onClose={() => setDupOpen(false)} />}
+      {bulkOpen && <BulkAddDialog parent={node.addr} parentName={labelOf(node)} scheme={scheme} onClose={() => setBulkOpen(false)} />}
+      {outlineOpen && <OutlineDialog parent={node.addr} parentName={labelOf(node)} scheme={scheme} onClose={() => setOutlineOpen(false)} />}
+      {dupOpen && (
+        <DuplicateDialog src={node.addr} srcName={labelOf(node)} scheme={scheme} explicitScheme={schemes[node.addr]} onClose={() => setDupOpen(false)} />
+      )}
       {prefabDraft && <PrefabEditor initial={prefabDraft} onClose={() => setPrefabDraft(null)} />}
     </div>
   );

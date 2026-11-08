@@ -12,6 +12,7 @@ import {
   ROOT,
 } from './address';
 import type { Entry, IpShare, NetAddr, ProxyDoc } from './types';
+import { nthDevice, type Scheme } from './ipscheme';
 
 /**
  * Pure edit operations on a ProxyDoc. Each returns a new doc and never
@@ -103,8 +104,9 @@ export interface DeviceTemplate {
   port2: string;
   ip3: string;
   port3: string;
-  /** How much to add to each address's last octet for every new child. */
+  /** Devices to advance per new child: addresses for flat, whole subnets for /31 and /30. */
   step: number;
+  scheme?: Scheme;
 }
 
 export interface BulkAddOptions {
@@ -136,12 +138,13 @@ export function bulkAddChildren(doc: ProxyDoc, parent: NetAddr, opts: BulkAddOpt
     if (opts.device) {
       const t = opts.device;
       const s = k * t.step;
+      const next = (ip: string) => (t.scheme ? nthDevice(ip, s, t.scheme) : incrementIp(ip, s));
       cur = addIpShare(cur, a, {
-        ip1: incrementIp(t.ip1, s),
+        ip1: next(t.ip1),
         port1: t.port1,
-        ip2: incrementIp(t.ip2, s),
+        ip2: next(t.ip2),
         port2: t.port2,
-        ip3: incrementIp(t.ip3, s),
+        ip3: next(t.ip3),
         port3: t.port3,
       });
     }
@@ -223,7 +226,7 @@ export function moveNet(
   src: NetAddr,
   parent: NetAddr,
   slot?: number,
-): { doc: ProxyDoc; addr: NetAddr; shifted: number } {
+): { doc: ProxyDoc; addr: NetAddr; shifted: number; remap: (a: NetAddr) => NetAddr } {
   if (src === ROOT) throw new OpError('The root cannot be moved');
   if (inSubtree(parent, src)) throw new OpError('Cannot move a net inside itself');
   if (depthOf(parent) >= MAX_DEPTH) throw new OpError(`${parent} is at the deepest level and can't have children`);
@@ -238,7 +241,7 @@ export function moveNet(
   const shifts: [number, number][] = [];
   let target: number;
   if (slot === undefined) {
-    if (sameParent) return { doc, addr: src, shifted: 0 };
+    if (sameParent) return { doc, addr: src, shifted: 0, remap: (a) => a };
     target = 0;
     for (let d = 1; d <= 15 && !target; d++) if (!occupiedDigit(d)) target = d;
     if (!target) throw new OpError(`${parent} already has 15 children (the maximum)`);
@@ -247,7 +250,7 @@ export function moveNet(
     target = slot;
     if (sameParent) {
       const s = childDigit(src);
-      if (slot === s) return { doc, addr: src, shifted: 0 };
+      if (slot === s) return { doc, addr: src, shifted: 0, remap: (a) => a };
       if (s < slot) for (let d = s + 1; d <= slot; d++) occupiedDigit(d) && shifts.push([d, d - 1]);
       else for (let d = slot; d < s; d++) occupiedDigit(d) && shifts.push([d, d + 1]);
     } else {
@@ -273,6 +276,7 @@ export function moveNet(
     },
     addr: newRoot,
     shifted: shifts.length,
+    remap: map,
   };
 }
 

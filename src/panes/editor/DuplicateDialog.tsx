@@ -1,19 +1,49 @@
 import { useMemo, useState } from 'react';
 import { cloneSubtree, suggestRename, type CloneOptions, type RenameRule } from '../../model/bulk';
 import { OpError } from '../../model/ops';
-import type { NetAddr } from '../../model/types';
+import type { NetAddr, ProxyDoc } from '../../model/types';
+import { inSubtree } from '../../model/address';
+import { ipToInt, type Scheme } from '../../model/ipscheme';
 import { useStore } from '../../state/store';
+import { useSchemes } from '../../state/schemes';
 
-export function DuplicateDialog({ src, srcName, onClose }: { src: NetAddr; srcName: string; onClose: () => void }) {
+type Mode = 'subnets' | '4' | '3';
+
+/** How many whole subnets the branch's Address 1s span, for back-to-back copies. */
+function subnetSpan(doc: ProxyDoc, src: NetAddr, scheme: Scheme): number {
+  const size = scheme === '/30' ? 4 : scheme === '/31' ? 2 : 1;
+  const vs = doc.ipShares.filter((s) => inSubtree(s.net, src)).map((s) => ipToInt(s.ip1)).filter((v): v is number => v !== null);
+  if (vs.length === 0) return 1;
+  const lo = Math.min(...vs) - (Math.min(...vs) % size);
+  const hi = Math.max(...vs) - (Math.max(...vs) % size);
+  return (hi - lo) / size + 1;
+}
+
+export function DuplicateDialog({
+  src,
+  srcName,
+  scheme,
+  explicitScheme,
+  onClose,
+}: {
+  src: NetAddr;
+  srcName: string;
+  scheme: Scheme;
+  explicitScheme?: Scheme;
+  onClose: () => void;
+}) {
   const doc = useStore((s) => s.doc);
+  const fileName = useStore((s) => s.fileName);
   const suggestion = useMemo(() => suggestRename(srcName), [srcName]);
+  const span = useMemo(() => subnetSpan(doc, src, scheme), [doc, src, scheme]);
   const [copies, setCopies] = useState(1);
   const [start, setStart] = useState(suggestion?.next ?? 2);
   const [rules, setRules] = useState<RenameRule[]>(suggestion ? [suggestion.rule] : [{ find: srcName, replace: `${srcName} {n}` }]);
-  const [octet, setOctet] = useState<3 | 4>(4);
-  const [step, setStep] = useState(10);
+  const [mode, setMode] = useState<Mode>(scheme === 'flat' ? '4' : 'subnets');
+  const [step, setStep] = useState(scheme === 'flat' ? 10 : span);
 
-  const opts: CloneOptions = { copies, startNumber: start, renameRules: rules, ip: { octet, step } };
+  const ip: CloneOptions['ip'] = mode === 'subnets' ? { scheme, step } : { octet: Number(mode) as 3 | 4, step };
+  const opts: CloneOptions = { copies, startNumber: start, renameRules: rules, ip };
   const result = useMemo(() => {
     try {
       return { ok: cloneSubtree(doc, src, opts) } as const;
@@ -21,7 +51,7 @@ export function DuplicateDialog({ src, srcName, onClose }: { src: NetAddr; srcNa
       if (e instanceof OpError) return { error: e.message } as const;
       throw e;
     }
-  }, [doc, src, copies, start, rules, octet, step]); // opts is rebuilt from these each render
+  }, [doc, src, copies, start, rules, mode, step, scheme]); // opts is rebuilt from these each render
 
   const setRule = (i: number, patch: Partial<RenameRule>) => setRules((rs) => rs.map((r, k) => (k === i ? { ...r, ...patch } : r)));
 
@@ -29,6 +59,8 @@ export function DuplicateDialog({ src, srcName, onClose }: { src: NetAddr; srcNa
     if (!('ok' in result) || !result.ok) return;
     const first = result.ok.copies[0]?.root;
     if (useStore.getState().apply((d) => cloneSubtree(d, src, opts).doc)) {
+      // Copies keep the scheme the source branch set on itself.
+      if (explicitScheme) result.ok.copies.forEach((c) => useSchemes.getState().set(fileName, c.root, explicitScheme));
       if (first) useStore.getState().select(first, 'editor');
       onClose();
     }
@@ -65,13 +97,21 @@ export function DuplicateDialog({ src, srcName, onClose }: { src: NetAddr; srcNa
             <div className="hint">Applied to every name in the copy. {'{n}'} = copy number, {'{n:2}'} = zero-padded. E.g. “F1 ” → “F{'{n}'} ” renames the cards too.</div>
           </div>
           <label htmlFor="d-step">Shift IPs by</label>
-          <div className="inline">
-            <input id="d-step" type="number" value={step} onChange={(e) => setStep(Number(e.target.value))} style={{ width: '8ch' }} />
-            <span className="muted">per copy, on the</span>
-            <select value={octet} onChange={(e) => setOctet(Number(e.target.value) as 3 | 4)} aria-label="Octet">
-              <option value={4}>last octet (x.x.x.N)</option>
-              <option value={3}>3rd octet (x.x.N.x)</option>
-            </select>
+          <div>
+            <div className="inline">
+              <input id="d-step" type="number" value={step} onChange={(e) => setStep(Number(e.target.value))} style={{ width: '8ch' }} />
+              <span className="muted">per copy, as</span>
+              <select value={mode} onChange={(e) => setMode(e.target.value as Mode)} aria-label="Shift mode">
+                {scheme !== 'flat' && <option value="subnets">whole {scheme} subnets (carries over)</option>}
+                <option value="4">addresses on the last octet (x.x.x.N)</option>
+                <option value="3">steps of the 3rd octet (x.x.N.x)</option>
+              </select>
+            </div>
+            {mode === 'subnets' && (
+              <div className="hint">
+                This branch spans {span} subnet{span === 1 ? '' : 's'}; {span} puts the copies back to back.
+              </div>
+            )}
           </div>
         </div>
 

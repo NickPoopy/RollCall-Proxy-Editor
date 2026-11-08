@@ -4,8 +4,17 @@ import { renderTemplate, type Value, type Vars } from './template';
 import { buildTree, labelOf, type TreeNode } from './tree';
 import type { NetAddr, ProxyDoc } from './types';
 import { isValidIp } from './validate';
+import { isScheme, resolveCidr, type Scheme } from './ipscheme';
 
-export type ParamType = 'int' | 'text' | 'ip' | 'bool';
+const SCHEME_PARAM: PrefabParam = {
+  key: 'scheme',
+  label: 'IP scheme',
+  type: 'scheme',
+  default: 'flat',
+  hint: 'L3: each device gets its own /31 or /30',
+};
+
+export type ParamType = 'int' | 'text' | 'ip' | 'bool' | 'scheme';
 
 export interface PrefabParam {
   key: string;
@@ -41,8 +50,12 @@ export function checkParam(p: PrefabParam, v: Value): string | null {
   }
   if (p.type === 'ip') {
     const s = String(v).trim();
-    if (s !== '' && s !== '-' && !isValidIp(s)) return `${p.label}: enter an IPv4 address, or "-" for none`;
+    const resolved = s.includes('/') ? resolveCidr(s) : s;
+    if (s !== '' && s !== '-' && (typeof resolved !== 'string' || !isValidIp(resolved))) {
+      return `${p.label}: enter an IPv4 address (or a /30 or /31 subnet), or "-" for none`;
+    }
   }
+  if (p.type === 'scheme' && !isScheme(String(v))) return `${p.label}: choose flat, /31 or /30`;
   return null;
 }
 
@@ -51,7 +64,13 @@ export function renderPrefab(p: Prefab, values: Vars): string {
   const vars: Vars = {};
   for (const param of p.params) {
     const v = values[param.key] ?? param.default;
-    vars[param.key] = param.type === 'int' ? Number(v) : param.type === 'bool' ? Boolean(v) : String(v);
+    let val: Value = param.type === 'int' ? Number(v) : param.type === 'bool' ? Boolean(v) : String(v).trim();
+    // Let IP settings be typed as a subnet: "10.20.0.8/30" -> device address.
+    if (param.type === 'ip' && String(val).includes('/')) {
+      const r = resolveCidr(String(val));
+      if (typeof r === 'string') val = r;
+    }
+    vars[param.key] = val;
   }
   // Drop trailing unused-address cells so the outline stays readable.
   return renderTemplate(p.body, vars)
@@ -76,15 +95,16 @@ export const BUILTIN_PREFABS: Prefab[] = [
       { key: 'firstCard', label: 'First card', type: 'int', default: 1, min: 1, max: 15 },
       { key: 'lastCard', label: 'Last card', type: 'int', default: 10, min: 1, max: 15 },
       { key: 'cardType', label: 'Card name', type: 'text', default: 'IQUCP25' },
-      { key: 'ipA', label: 'Address 1 of card 1', type: 'ip', default: '10.100.82.10', hint: 'Card n gets +(n−1)' },
+      SCHEME_PARAM,
+      { key: 'ipA', label: 'Address 1 of card 1', type: 'ip', default: '10.100.82.10', hint: 'Card n is n−1 devices on' },
       { key: 'ipB', label: 'Address 2 of card 1', type: 'ip', default: '10.100.83.10', hint: '“-” for none' },
-      { key: 'frameStep', label: 'IP step per frame', type: 'int', default: 10 },
+      { key: 'frameStep', label: 'Devices per frame (IP step)', type: 'int', default: 10 },
     ],
     body: [
       '@repeat f 0..frames-1',
       '[{{hex(firstFrame+f)}}] Frame {{pad(firstFrame+f, 2)}}',
       '@repeat c firstCard..lastCard',
-      '\t[{{hex(c)}}] F{{firstFrame+f}} {{cardType}}_{{pad(c, 2)}}\t{{ip(ipA, f*frameStep + c-1)}}\t{{ip(ipB, f*frameStep + c-1)}}',
+      '\t[{{hex(c)}}] F{{firstFrame+f}} {{cardType}}_{{pad(c, 2)}}\t{{addr(ipA, f*frameStep + c-1, scheme)}}\t{{addr(ipB, f*frameStep + c-1, scheme)}}',
       '@end',
       '@end',
     ].join('\n'),
@@ -99,16 +119,17 @@ export const BUILTIN_PREFABS: Prefab[] = [
       { key: 'first', label: 'First number', type: 'int', default: 1, min: 0 },
       { key: 'prefix', label: 'Name', type: 'text', default: 'MV', hint: 'Number is added after it' },
       { key: 'ports', label: 'IP control ports each', type: 'int', default: 4, min: 0, max: 14 },
-      { key: 'ip', label: 'MV Control IP (first MV)', type: 'ip', default: '10.10.82.10', hint: 'Ports follow at +1, +2…' },
+      SCHEME_PARAM,
+      { key: 'ip', label: 'MV Control IP (first MV)', type: 'ip', default: '10.10.82.10', hint: 'Ports are the next devices' },
       { key: 'ip2', label: 'Address 2 (first MV)', type: 'ip', default: '-', hint: '“-” for none' },
-      { key: 'step', label: 'IP step per MV', type: 'int', default: 10 },
+      { key: 'step', label: 'Devices per MV (IP step)', type: 'int', default: 10, hint: 'Use ports+1 for no gaps' },
     ],
     body: [
       '@repeat m 0..count-1',
       '{{prefix}}{{first+m}}',
-      '\tMV Control\t{{ip(ip, m*step)}}\t{{ip(ip2, m*step)}}',
+      '\tMV Control\t{{addr(ip, m*step, scheme)}}\t{{addr(ip2, m*step, scheme)}}',
       '@repeat p 1..ports',
-      '\tIP Control Port {{p}}\t{{ip(ip, m*step + p)}}\t{{ip(ip2, m*step + p)}}',
+      '\tIP Control Port {{p}}\t{{addr(ip, m*step + p, scheme)}}\t{{addr(ip2, m*step + p, scheme)}}',
       '@end',
       '@end',
     ].join('\n'),
@@ -123,15 +144,16 @@ export const BUILTIN_PREFABS: Prefab[] = [
       { key: 'first', label: 'First number', type: 'int', default: 1, min: 0 },
       { key: 'prefix', label: 'Name', type: 'text', default: 'MV' },
       { key: 'ports', label: 'Ports each', type: 'int', default: 4, min: 1, max: 15 },
+      SCHEME_PARAM,
       { key: 'ipA', label: 'Address 1 of Port 1 (first MV)', type: 'ip', default: '10.100.80.11' },
       { key: 'ipB', label: 'Address 2 of Port 1 (first MV)', type: 'ip', default: '10.100.81.10', hint: '“-” for none' },
-      { key: 'step', label: 'IP step per MV', type: 'int', default: 10 },
+      { key: 'step', label: 'Devices per MV (IP step)', type: 'int', default: 10, hint: 'Use ports for no gaps' },
     ],
     body: [
       '@repeat m 0..count-1',
       '{{prefix}}{{first+m}}',
       '@repeat p 1..ports',
-      '\t[{{hex(p)}}] Port {{p}}\t{{ip(ipA, m*step + p-1)}}\t{{ip(ipB, m*step + p-1)}}',
+      '\t[{{hex(p)}}] Port {{p}}\t{{addr(ipA, m*step + p-1, scheme)}}\t{{addr(ipB, m*step + p-1, scheme)}}',
       '@end',
       '@end',
     ].join('\n'),
@@ -149,7 +171,7 @@ export const BUILTIN_PREFABS: Prefab[] = [
  * - every copy shifts its IPs by a step
  * - children keep their exact slots
  */
-export function prefabFromBranch(doc: ProxyDoc, addr: NetAddr, defaultPort = '2050'): Prefab {
+export function prefabFromBranch(doc: ProxyDoc, addr: NetAddr, defaultPort = '2050', scheme: Scheme = 'flat'): Prefab {
   const tree = buildTree(doc);
   const root = tree.byAddr.get(addr);
   if (!root) throw new Error(`No net at ${addr}`);
@@ -174,7 +196,9 @@ export function prefabFromBranch(doc: ProxyDoc, addr: NetAddr, defaultPort = '20
   };
   walkIps(root);
   const range = lastOctets.length ? Math.max(...lastOctets) - Math.min(...lastOctets) : 0;
-  const step = [10, 20, 50, 100].find((s) => s > range) ?? 0;
+  // Flat: round up to a tidy step. L3: copies sit back to back, so the block size.
+  const size = scheme === '/30' ? 4 : scheme === '/31' ? 2 : 1;
+  const step = scheme === 'flat' ? ([10, 20, 50, 100].find((s) => s > range) ?? 0) : range - (range % size) + size;
 
   const params: PrefabParam[] = [];
   let nameExpr = rootName;
@@ -193,7 +217,15 @@ export function prefabFromBranch(doc: ProxyDoc, addr: NetAddr, defaultPort = '20
     params.push({ key: `net${i + 1}`, label: `Network ${i + 1}`, type: 'text', default: n, hint: 'First three octets, e.g. 10.10.82' }),
   );
   const offset = sug ? 'k*step' : '0';
-  if (sug && nets.length) params.push({ key: 'step', label: 'IP step per copy', type: 'int', default: step });
+  if (sug && nets.length) {
+    params.push({
+      key: 'step',
+      label: 'IP step per copy (addresses)',
+      type: 'int',
+      default: step,
+      hint: scheme === 'flat' ? undefined : `Branch is ${scheme}: ${step} = next free block`,
+    });
+  }
 
   const ipExpr = (ip: string, port: string) => {
     if (!isValidIp(ip)) return '-';
@@ -238,6 +270,6 @@ export function isPrefab(x: unknown): x is Prefab {
     typeof p.name === 'string' &&
     typeof p.body === 'string' &&
     Array.isArray(p.params) &&
-    p.params.every((q) => typeof q.key === 'string' && typeof q.label === 'string' && ['int', 'text', 'ip', 'bool'].includes(q.type))
+    p.params.every((q) => typeof q.key === 'string' && typeof q.label === 'string' && ['int', 'text', 'ip', 'bool', 'scheme'].includes(q.type))
   );
 }

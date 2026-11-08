@@ -5,6 +5,8 @@ import { serialize } from '../model/serialize';
 import { validate } from '../model/validate';
 import type { Diagnostic, LineIndex, NetAddr, ProxyDoc } from '../model/types';
 import type { FileEncoding } from './files';
+import type { SchemeMap } from '../model/ipscheme';
+import { schemesFor } from './schemes';
 
 export type Origin = 'text' | 'editor' | 'preview';
 
@@ -45,6 +47,8 @@ export interface AppState extends Derived {
   select: (addr: NetAddr | null, origin: Origin) => void;
   /** Rewrite IpShare0..N in order with no gaps. Returns true if anything changed. */
   renumberIpShares: () => boolean;
+  /** Re-run validation, e.g. after an IP scheme changed. */
+  revalidate: () => void;
   undo: () => void;
   redo: () => void;
   markSaved: (meta: { fileName?: string; fileHandle?: FileSystemFileHandle | null }) => void;
@@ -55,7 +59,7 @@ export interface AppState extends Derived {
 const HISTORY_LIMIT = 200;
 const TYPING_GROUP_MS = 1000;
 
-function derive(text: string, prevDoc: ProxyDoc | null, prevIssues: Diagnostic[]): Derived {
+function derive(text: string, prevDoc: ProxyDoc | null, prevIssues: Diagnostic[], schemes: SchemeMap = {}): Derived {
   const r = parse(text);
   const lineToAddr = new Map<number, NetAddr>();
   r.lineIndex.netNames.forEach((lines, addr) => lines.forEach((l) => lineToAddr.set(l, addr)));
@@ -69,7 +73,7 @@ function derive(text: string, prevDoc: ProxyDoc | null, prevIssues: Diagnostic[]
     lineIndex: r.lineIndex,
     lineToAddr,
     parseErrors,
-    issues: [...r.diagnostics.filter((d) => d.severity !== 'error'), ...validate(r.doc, r.lineIndex)],
+    issues: [...r.diagnostics.filter((d) => d.severity !== 'error'), ...validate(r.doc, r.lineIndex, schemes)],
   };
 }
 
@@ -102,7 +106,7 @@ export const useStore = create<AppState>((set, get) => ({
     const now = Date.now();
     const push = now - s.lastPushAt > TYPING_GROUP_MS;
     set({
-      ...derive(text, s.doc, s.issues),
+      ...derive(text, s.doc, s.issues, schemesFor(s.fileName)),
       text,
       past: push ? [...s.past, s.text].slice(-HISTORY_LIMIT) : s.past,
       future: [],
@@ -112,7 +116,7 @@ export const useStore = create<AppState>((set, get) => ({
 
   load: (text, meta) => {
     set({
-      ...derive(text, null, []),
+      ...derive(text, null, [], schemesFor(meta.fileName)),
       text,
       savedText: text,
       fileName: meta.fileName,
@@ -143,7 +147,7 @@ export const useStore = create<AppState>((set, get) => ({
     const text = serialize(next);
     if (text === s.text) return true;
     set({
-      ...derive(text, s.doc, s.issues),
+      ...derive(text, s.doc, s.issues, schemesFor(s.fileName)),
       text,
       past: [...s.past, s.text].slice(-HISTORY_LIMIT),
       future: [],
@@ -159,6 +163,12 @@ export const useStore = create<AppState>((set, get) => ({
     return s.apply((d) => ({ ...d }));
   },
 
+  revalidate: () => {
+    const s = get();
+    if (s.parseErrors.length > 0) return;
+    set({ issues: derive(s.text, s.doc, s.issues, schemesFor(s.fileName)).issues });
+  },
+
   select: (addr, origin) => {
     if (get().selected === addr && get().selectOrigin === origin) return;
     set({ selected: addr, selectOrigin: origin });
@@ -169,7 +179,7 @@ export const useStore = create<AppState>((set, get) => ({
     if (s.past.length === 0) return;
     const prev = s.past[s.past.length - 1];
     set({
-      ...derive(prev, s.doc, s.issues),
+      ...derive(prev, s.doc, s.issues, schemesFor(s.fileName)),
       text: prev,
       past: s.past.slice(0, -1),
       future: [s.text, ...s.future],
@@ -182,7 +192,7 @@ export const useStore = create<AppState>((set, get) => ({
     if (s.future.length === 0) return;
     const next = s.future[0];
     set({
-      ...derive(next, s.doc, s.issues),
+      ...derive(next, s.doc, s.issues, schemesFor(s.fileName)),
       text: next,
       past: [...s.past, s.text],
       future: s.future.slice(1),

@@ -156,6 +156,8 @@ input[type='checkbox'] { width: auto; }
 .addr-pair label { color: var(--muted); font-size: 12px; }
 .addr-pair .ip { font-family: var(--mono); }
 .addr-pair .port { font-family: var(--mono); width: 7ch; }
+.subnet-note { grid-column: 2 / -1; font: 10.5px var(--mono); color: var(--muted); margin: -1px 0 3px; }
+.nt-scheme { font: 10px var(--mono); color: var(--info); border: 1px solid #2f4b6b; border-radius: 3px; padding: 0 3px; }
 
 .issue-list { list-style: none; margin: 0; padding: 4px 0; }
 .issue-list li { display: flex; gap: 8px; align-items: baseline; padding: 4px 12px; color: var(--text); }

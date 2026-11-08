@@ -1,4 +1,5 @@
 import { incrementIp } from './ops';
+import { isScheme, nthDevice } from './ipscheme';
 import { isValidIp } from './validate';
 
 /**
@@ -14,6 +15,7 @@ import { isValidIp } from './validate';
  *   pad(n, width)   zero-pad: pad(3, 2) = "03"
  *   hex(n)          hex digit: hex(10) = "A"
  *   ip(base, off)   add off to an IP's last octet (carrying); "-" or "" stays "-"
+ *   addr(base, i, scheme)  the i-th device address from base: flat steps 1, /31 steps 2, /30 steps 4
  * '+' joins text when either side is text.
  */
 
@@ -68,6 +70,15 @@ const FUNCS: Record<string, (...a: Value[]) => Value> = {
     const v = Number(n);
     if (!Number.isInteger(v) || v < 0 || v > 15) throw new TemplateError(`hex(${n}): needs a whole number 0–15`);
     return v.toString(16).toUpperCase();
+  },
+  addr: (base, index, scheme) => {
+    const s = String(scheme ?? 'flat');
+    if (!isScheme(s)) throw new TemplateError(`addr(): unknown scheme "${s}" (use flat, /31 or /30)`);
+    try {
+      return nthDevice(String(base ?? ''), Number(index ?? 0), s);
+    } catch (e) {
+      throw new TemplateError(`addr(): ${(e as Error).message}`);
+    }
   },
   ip: (base, off) => {
     const b = String(base ?? '').trim();

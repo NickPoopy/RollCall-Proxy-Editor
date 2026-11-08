@@ -4,6 +4,7 @@ import { moveNet } from '../../model/ops';
 import { labelOf, type Tree, type TreeNode } from '../../model/tree';
 import type { NetAddr } from '../../model/types';
 import { useStore } from '../../state/store';
+import { useSchemes } from '../../state/schemes';
 
 interface Props {
   tree: Tree;
@@ -61,6 +62,8 @@ const Item = memo(function Item({
   issueAddrs: Map<NetAddr, 'error' | 'warning'>;
 }) {
   const selected = useStore((s) => s.selected === node.addr);
+  const fileName = useStore((s) => s.fileName);
+  const schemeTag = useSchemes((s) => s.byFile[fileName]?.[node.addr]);
   const drag = useContext(Drag)!;
   const ref = useRef<HTMLDivElement>(null);
   const expandTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -141,14 +144,17 @@ const Item = memo(function Item({
           const t = dropTarget(src, node.addr, zoneAt(e));
           if (!t) return;
           const st = useStore.getState();
-          let result: { addr: NetAddr; shifted: number } | null = null;
+          type Moved = ReturnType<typeof moveNet>;
+          let result: Moved | null = null;
           const ok = st.apply((d) => {
             const r = moveNet(d, src, t.parent, t.slot);
             result = r;
             return r.doc;
           });
-          const r = result as { addr: NetAddr; shifted: number } | null;
+          const r = result as Moved | null;
           if (ok && r && r.addr !== src) {
+            // IP schemes set on moved nets go with them.
+            useSchemes.getState().remap(st.fileName, r.remap);
             st.select(r.addr, 'editor');
             if (t.slot === undefined) drag.expand(t.parent);
             const extra = r.shifted ? `; ${r.shifted} sibling${r.shifted > 1 ? 's' : ''} shifted one slot` : '';
@@ -167,6 +173,7 @@ const Item = memo(function Item({
         </span>
         {!isRoot && <span className="nt-grip" aria-hidden="true">⋮⋮</span>}
         <span className="nt-name">{labelOf(node)}</span>
+        {schemeTag && <span className="nt-scheme" title={`IP scheme ${schemeTag} for this branch`}>{schemeTag}</span>}
         {sev && <span className={`nt-dot sev-${sev}`} title={`Has ${sev}s. See the Issues tab.`}>●</span>}
         {node.devices.length > 0 && (
           <span className="nt-dev" title={`${node.devices.length} device(s)`}>
@@ -259,7 +266,7 @@ export function NodeTree({ tree, filter }: Props) {
           if (!dragging) return;
           const el = e.currentTarget;
           const r = el.getBoundingClientRect();
-          const edge = 40;
+          const edge = 24;
           if (e.clientY < r.top + edge) el.scrollTop -= Math.ceil((r.top + edge - e.clientY) / 3);
           else if (e.clientY > r.bottom - edge) el.scrollTop += Math.ceil((e.clientY - (r.bottom - edge)) / 3);
         }}
