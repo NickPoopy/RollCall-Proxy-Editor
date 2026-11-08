@@ -6,6 +6,7 @@ First usable alpha of RollCall Proxy Editor.
 - Three synced panes: raw text, friendly editor, RollCall tree preview
 - Open / save proxy files with line endings and encoding preserved (untouched lines are byte-identical)
 - Add, rename, move, reorder and delete nets, with automatic addressing
+- Drag and drop nets in the tree to re-parent or reorder them
 - Bulk add children with name patterns and auto-incrementing device IPs
 - Duplicate a whole branch N times, with rename rules and IP shifting (e.g. MV1 → MV2–MV7)
 - Toolbox with prefabs (IQ frames + cards, Multiviewers, MV media ports) driven by simple settings

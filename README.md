@@ -17,6 +17,7 @@ Click a net in any pane and it's highlighted in the other two.
 ## Features
 
 - **Open / Save** proxy files. In Chrome and Edge, Save writes back to the same file. Line endings (CRLF) and encoding are preserved, and untouched lines come out byte-for-byte identical.
+- **Drag and drop** in the Tree tab. Drop on a net to move inside it, or on the top/bottom edge of a row to place before/after it. Children and devices come along. Because a net's position *is* its address, siblings shift one slot to make room. The toast tells you what moved, and Ctrl+Z undoes it.
 - **Add, rename, move, reorder and delete** nets. Addresses are picked automatically (next free slot), and moving a net moves everything under it.
 - **Bulk add**: create e.g. 10 children named `Video {n:2}` with device IPs counting up from `10.0.0.10`.
 - **Duplicate…**: stamp out copies of a whole branch (e.g. MV1 → MV2–MV7) with every child and device. Names are renamed with find → replace rules (`MV1` → `MV{n}`), and every IP shifts by a step per copy (e.g. +10 on the last octet).

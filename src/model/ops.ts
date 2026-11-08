@@ -210,6 +210,72 @@ export function shiftNet(doc: ProxyDoc, addr: NetAddr, dir: -1 | 1): { doc: Prox
   return { doc: occupied(doc, target) ? swapSubtrees(doc, addr, target) : moveSubtree(doc, addr, target), addr: target };
 }
 
+/**
+ * Move a net (and everything under it) to `parent`, used by drag and drop.
+ * - No slot: the next free slot under parent.
+ * - With a slot: the net takes that slot. Siblings in the way shift by one
+ *   toward the free space, like inserting into a list. Within the same
+ *   parent this is a reorder.
+ * Returns the new doc, the net's new address and how many siblings shifted.
+ */
+export function moveNet(
+  doc: ProxyDoc,
+  src: NetAddr,
+  parent: NetAddr,
+  slot?: number,
+): { doc: ProxyDoc; addr: NetAddr; shifted: number } {
+  if (src === ROOT) throw new OpError('The root cannot be moved');
+  if (inSubtree(parent, src)) throw new OpError('Cannot move a net inside itself');
+  if (depthOf(parent) >= MAX_DEPTH) throw new OpError(`${parent} is at the deepest level and can't have children`);
+
+  const sameParent = parentOf(src) === parent;
+  const others = [...usedAddrs(doc)].filter((a) => !inSubtree(a, src));
+  const occupiedDigit = (d: number) => {
+    const a = childAddr(parent, d)!;
+    return others.some((u) => inSubtree(u, a));
+  };
+
+  const shifts: [number, number][] = [];
+  let target: number;
+  if (slot === undefined) {
+    if (sameParent) return { doc, addr: src, shifted: 0 };
+    target = 0;
+    for (let d = 1; d <= 15 && !target; d++) if (!occupiedDigit(d)) target = d;
+    if (!target) throw new OpError(`${parent} already has 15 children (the maximum)`);
+  } else {
+    if (slot < 1 || slot > 15) throw new OpError('There is no slot there (slots run 1–F)');
+    target = slot;
+    if (sameParent) {
+      const s = childDigit(src);
+      if (slot === s) return { doc, addr: src, shifted: 0 };
+      if (s < slot) for (let d = s + 1; d <= slot; d++) occupiedDigit(d) && shifts.push([d, d - 1]);
+      else for (let d = slot; d < s; d++) occupiedDigit(d) && shifts.push([d, d + 1]);
+    } else {
+      let free = slot;
+      while (free <= 15 && occupiedDigit(free)) free++;
+      if (free > 15) throw new OpError(`No room to insert there: ${parent} has no free slot from ${slot.toString(16).toUpperCase()} onward`);
+      for (let d = slot; d < free; d++) shifts.push([d, d + 1]);
+    }
+  }
+
+  const newRoot = childAddr(parent, target)!;
+  const sibs = shifts.map(([from, to]) => [childAddr(parent, from)!, childAddr(parent, to)!] as const);
+  const map = (a: NetAddr) => {
+    if (inSubtree(a, src)) return rebaseAddr(a, src, newRoot);
+    for (const [from, to] of sibs) if (inSubtree(a, from)) return rebaseAddr(a, from, to);
+    return a;
+  };
+  return {
+    doc: {
+      ...doc,
+      netNames: doc.netNames.map((n) => ({ ...n, addr: map(n.addr) })),
+      ipShares: doc.ipShares.map((s) => ({ ...s, net: map(s.net) })),
+    },
+    addr: newRoot,
+    shifted: shifts.length,
+  };
+}
+
 export function sortNetNames(doc: ProxyDoc): ProxyDoc {
   return { ...doc, netNames: [...doc.netNames].sort((a, b) => compareAddr(a.addr, b.addr)) };
 }
