@@ -17,6 +17,7 @@ export function EditorPane() {
   const tree = useMemo(() => buildTree(doc), [doc]);
   const [tab, setTab] = useState<Tab>('tree');
   const [filter, setFilter] = useState('');
+  const [treeCmd, setTreeCmd] = useState<{ kind: 'expand' | 'collapse'; n: number }>();
   const node = (selected && tree.byAddr.get(selected)) || null;
   const problemCount = issues.filter((i) => i.severity !== 'info').length;
 
@@ -46,8 +47,14 @@ export function EditorPane() {
           <div className="tree-tab">
             <div className="tree-tools">
               <input type="search" placeholder="Filter by name or address…" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter nets" />
+              <button className="small" onClick={() => setTreeCmd((c) => ({ kind: 'expand', n: (c?.n ?? 0) + 1 }))} title="Expand every branch">
+                Expand all
+              </button>
+              <button className="small" onClick={() => setTreeCmd((c) => ({ kind: 'collapse', n: (c?.n ?? 0) + 1 }))} title="Collapse to the top level">
+                Collapse
+              </button>
             </div>
-            <NodeTree tree={tree} filter={filter} />
+            <NodeTree tree={tree} filter={filter} command={treeCmd} />
             {node ? (
               <NodeDetails node={node} />
             ) : (

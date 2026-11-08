@@ -9,6 +9,8 @@ import { useSchemes } from '../../state/schemes';
 interface Props {
   tree: Tree;
   filter: string;
+  /** Bumped by the Expand all / Collapse buttons; `n` changes on every click. */
+  command?: { kind: 'expand' | 'collapse'; n: number };
 }
 
 type Zone = 'before' | 'into' | 'after';
@@ -190,8 +192,15 @@ const Item = memo(function Item({
   );
 });
 
-export function NodeTree({ tree, filter }: Props) {
+export function NodeTree({ tree, filter, command }: Props) {
   const [collapsed, setCollapsed] = useState<Set<NetAddr>>(new Set());
+
+  // Expand all / Collapse (collapse keeps the root open so the top level stays visible).
+  useEffect(() => {
+    if (!command) return;
+    if (command.kind === 'expand') setCollapsed(new Set());
+    else setCollapsed(new Set([...tree.byAddr.values()].filter((n) => n.addr !== ROOT && n.children.length > 0).map((n) => n.addr)));
+  }, [command]); // only react to clicks, not to tree edits
   const [dragging, setDragging] = useState<NetAddr | null>(null);
   const [hint, setHint] = useState<DropHint | null>(null);
   const selected = useStore((s) => s.selected);
