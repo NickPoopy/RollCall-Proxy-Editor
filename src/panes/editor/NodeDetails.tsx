@@ -76,6 +76,9 @@ export function NodeDetails({ node }: { node: TreeNode }) {
             {!isRoot && <> · RollCall shows {displayAddr(node.addr)} · slot {childDigit(node.addr).toString(16).toUpperCase()}</>}
           </div>
         </div>
+        <button className="details-close" onClick={() => select(null, 'editor')} title="Close" aria-label="Close the edit panel">
+          ✕
+        </button>
       </div>
 
       <div className="field">

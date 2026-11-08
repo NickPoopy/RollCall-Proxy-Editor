@@ -140,6 +140,10 @@ input[type='checkbox'] { width: auto; }
 
 .details { flex: 0 1 auto; max-height: 60%; overflow: auto; border-top: 1px solid var(--border); padding: 10px 12px; background: var(--panel-2); }
 .details-title { font-size: 15px; font-weight: 600; }
+.details-head { display: flex; align-items: flex-start; gap: 8px; }
+.details-head > div { flex: 1; min-width: 0; }
+.details-close { border-color: transparent; background: transparent; color: var(--muted); padding: 0 6px; font-size: 14px; line-height: 22px; }
+.details-close:hover:not(:disabled) { color: var(--text); background: var(--panel); border-color: var(--border); }
 .field { display: grid; grid-template-columns: 70px 1fr; align-items: center; gap: 4px 8px; margin-top: 8px; }
 .field label { color: var(--muted); font-size: 12px; }
 .field .hint { grid-column: 2; }
