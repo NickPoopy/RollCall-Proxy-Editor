@@ -20,7 +20,14 @@ Click a net in any pane and it's highlighted in the other two.
 - **Add, rename, move, reorder and delete** nets. Addresses are picked automatically (next free slot), and moving a net moves everything under it.
 - **Bulk add**: create e.g. 10 children named `Video {n:2}` with device IPs counting up from `10.0.0.10`.
 - **Duplicate…**: stamp out copies of a whole branch (e.g. MV1 → MV2–MV7) with every child and device. Names are renamed with find → replace rules (`MV1` → `MV{n}`), and every IP shifts by a step per copy (e.g. +10 on the last octet).
-- **Paste outline…**: build a whole tree in one go from an indented outline or a paste from Excel (see below). **Copy branch as outline** exports a branch the same way, so you can edit it in Excel and paste it back.
+- **Toolbox…**: ready-made prefabs with a few simple settings (count, first number, base IPs, IP step):
+  - **IQ frames + cards**: frames with cards in the slots that match their card numbers, plus paired addresses
+  - **Multiviewers**: MV Control plus IP Control Port 1–n
+  - **MV media ports**: Port 1–n, each with two addresses
+
+  Changing a setting regenerates the outline, which you can still hand-edit before adding.
+- **Save as prefab…**: turn any branch into your own prefab. A number in the branch name becomes "how many / first number", each IP network becomes a setting, and IPs step per copy. My prefabs are saved in the browser and can be **exported/imported as a .json file** to share with the team.
+- **Outlines**: the Toolbox also takes an indented outline or a paste from Excel (see below). **Copy branch as outline** exports a branch the same way, so you can edit it in Excel and paste it back.
 - **Devices table**: edit every `IpShare` line in one grid, with filtering.
 - **Settings**: edit the other sections (`[Combiner Services]`, `[MonitoringToLogServer]`, …) as key/value pairs.
 - **Validation**: duplicate addresses, unnamed parents, bad IPs/ports, more than 15 children, duplicate IP:port.
@@ -52,6 +59,22 @@ Replay
 		EVS 2 @ 10.30.1.12:2051, 10.31.1.12
 Routers
 	Spare Router	10.30.2.1
+```
+
+`[3] Name` puts a net in slot 3 instead of the next free slot. For example, `[A] F1 IQUCP25_10` lands at `…A`, matching the card number.
+
+### Prefab templates
+
+A prefab is an outline with settings. `{{expr}}` inserts a value. `@repeat i FROM..TO` … `@end` repeats lines, and `@if expr` … `@end` keeps lines only when the condition is true. Functions: `pad(n, 2)` → `03`, `hex(n)` → slot digit, `ip(base, offset)` → base IP plus offset on the last octet (`-` stays `-`).
+
+```
+@repeat m 0..count-1
+{{prefix}}{{first+m}}
+	MV Control	{{ip(ip, m*step)}}
+@repeat p 1..ports
+	IP Control Port {{p}}	{{ip(ip, m*step + p)}}
+@end
+@end
 ```
 
 With "Reuse existing nets with the same name" on, `Routers` above goes into the existing Routers net instead of creating a second one. The preview shows which rows are new and which already exist before anything is changed.

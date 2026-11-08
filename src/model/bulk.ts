@@ -1,5 +1,5 @@
 import { childAddr, childDigit, depthOf, inSubtree, MAX_CHILDREN, MAX_DEPTH, parentOf, ROOT } from './address';
-import { addChild, addIpShare, formatPattern, OpError, rebaseAddr, usedAddrs } from './ops';
+import { addChild, addIpShare, formatPattern, insertNetName, OpError, rebaseAddr, usedAddrs } from './ops';
 import { buildTree, type TreeNode } from './tree';
 import type { IpShare, NetAddr, NetName, ProxyDoc } from './types';
 import { isValidIp, isValidPort } from './validate';
@@ -137,6 +137,8 @@ export interface OutlineRow {
   addrs: (OutlineAddr | null)[];
   /** 0-based line in the outline text. */
   line: number;
+  /** Explicit slot digit (1-15) from a "[x] " prefix; otherwise the next free slot is used. */
+  slot?: number;
 }
 
 export interface OutlineError {
@@ -207,7 +209,18 @@ export function parseOutline(text: string): { rows: OutlineRow[]; errors: Outlin
       errors.push({ line: r.line, message: `Indented ${depth - prevDepth} levels deeper than the line above; only one level at a time` });
       return;
     }
-    const { name, cells } = splitBody(r.body);
+    let body = r.body;
+    let slot: number | undefined;
+    const sm = /^\[([0-9A-Fa-f])\]\s*/.exec(body);
+    if (sm) {
+      slot = parseInt(sm[1], 16);
+      body = body.slice(sm[0].length);
+      if (slot === 0) {
+        errors.push({ line: r.line, message: 'Slot [0] is not allowed; use 1–F' });
+        return;
+      }
+    }
+    const { name, cells } = splitBody(body);
     if (!name) {
       errors.push({ line: r.line, message: 'Missing a name' });
       return;
@@ -230,7 +243,7 @@ export function parseOutline(text: string): { rows: OutlineRow[]; errors: Outlin
       errors.push({ line: r.line, message: 'Address 1 is required when Address 2 or 3 is given' });
       return;
     }
-    rows.push({ depth, name, addrs, line: r.line });
+    rows.push({ depth, name, addrs, line: r.line, slot });
     prevDepth = depth;
   });
 
@@ -266,7 +279,20 @@ export function applyOutline(doc: ProxyDoc, parent: NetAddr, rows: OutlineRow[],
 
     let addr: NetAddr | undefined;
     let status: PlanRow['status'] = 'new';
-    if (opts.merge) {
+    if (row.slot !== undefined) {
+      const a = childAddr(at, row.slot)!;
+      const named = cur.netNames.find((n) => n.addr === a);
+      if (named && opts.merge && named.name === row.name) {
+        addr = a;
+        status = 'existing';
+      } else if (named || [...usedAddrs(cur)].some((u) => inSubtree(u, a))) {
+        const what = named ? `“${named.name}”` : 'another net';
+        throw new OpError(`${where}: slot [${row.slot.toString(16).toUpperCase()}] under ${at} (${a}) is already used by ${what}`);
+      } else {
+        cur = insertNetName(cur, a, row.name);
+        addr = a;
+      }
+    } else if (opts.merge) {
       addr = cur.netNames.find((n) => n.name === row.name && n.addr !== ROOT && parentOf(n.addr) === at && depthOf(n.addr) === depthOf(at) + 1)?.addr;
       if (addr) status = 'existing';
     }
@@ -313,7 +339,7 @@ export function applyOutline(doc: ProxyDoc, parent: NetAddr, rows: OutlineRow[],
  * ready to paste into Excel or back into the outline dialog. For the root,
  * its children are exported.
  */
-export function exportOutline(doc: ProxyDoc, addr: NetAddr, defaultPort = '2050'): string {
+export function exportOutline(doc: ProxyDoc, addr: NetAddr, defaultPort = '2050', opts: { slots?: boolean } = {}): string {
   const tree = buildTree(doc);
   const start = tree.byAddr.get(addr);
   if (!start) return '';
@@ -321,7 +347,9 @@ export function exportOutline(doc: ProxyDoc, addr: NetAddr, defaultPort = '2050'
   const cell = (ip: string, port: string) => (ip === '-' ? '-' : port === defaultPort ? ip : `${ip}:${port}`);
 
   const walk = (node: TreeNode, depth: number) => {
-    const indent = '\t'.repeat(depth);
+    // With slots, every net below the exported top level keeps its exact slot.
+    const slot = opts.slots && depth > 0 ? `[${childDigit(node.addr).toString(16).toUpperCase()}] ` : '';
+    const indent = '\t'.repeat(depth) + slot;
     const name = node.named ? node.name : `Net ${node.addr}`;
     if (node.devices.length === 0) lines.push(indent + name);
     for (const i of node.devices) {

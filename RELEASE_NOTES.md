@@ -8,7 +8,9 @@ First usable alpha of RollCall Proxy Editor.
 - Add, rename, move, reorder and delete nets, with automatic addressing
 - Bulk add children with name patterns and auto-incrementing device IPs
 - Duplicate a whole branch N times, with rename rules and IP shifting (e.g. MV1 → MV2–MV7)
-- Paste outline: build trees from an indented outline or straight from Excel, and copy any branch back out as an outline
+- Toolbox with prefabs (IQ frames + cards, Multiviewers, MV media ports) driven by simple settings
+- Save any branch as your own prefab, with export/import as .json to share with the team
+- Outlines: build trees from indented text or straight from Excel, and copy any branch back out as an outline
 - Devices (IpShare) table and settings editor for the other sections
 - Validation of addresses, IPs, ports and tree shape
 - Undo / redo and browser draft autosave
