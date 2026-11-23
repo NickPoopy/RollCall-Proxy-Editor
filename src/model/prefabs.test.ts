@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { inSubtree } from './address';
 import { applyOutline, parseOutline } from './bulk';
 import { parse } from './parse';
-import { BUILTIN_PREFABS, defaultValues, prefabFromBranch, renderPrefab, type Prefab } from './prefabs';
+import { BUILTIN_PREFABS, checkParam, defaultValues, isPrefab, prefabFromBranch, renderPrefab, type Prefab } from './prefabs';
 import { evaluate, renderTemplate, TemplateError } from './template';
 import { removeSubtree } from './ops';
 import type { ProxyDoc } from './types';
@@ -70,6 +70,29 @@ describe('built-in prefabs reproduce the sample file', () => {
     expect(snapshot(d, 'A140')).toEqual(snapshot(doc, 'A140'));
   });
 });
+describe('choice settings', () => {
+  const p: Prefab = {
+    id: 'x',
+    name: 'Frame 1',
+    description: '',
+    group: 'Team',
+    params: [{ key: 'part', label: 'Add', type: 'choice', options: ['Media', 'Control'], default: 'Media' }],
+    body: "@if part == 'Media'\nFrame 1 Media\n\t[1] Card 1\t10.0.0.1\t10.1.0.1\n@end\n@if part == 'Control'\nFrame 1\t10.2.0.1\n@end",
+  };
+
+  it('renders only the chosen part', () => {
+    expect(renderPrefab(p, { part: 'Media' })).toBe('Frame 1 Media\n\t[1] Card 1\t10.0.0.1\t10.1.0.1');
+    expect(renderPrefab(p, { part: 'Control' })).toBe('Frame 1\t10.2.0.1');
+  });
+
+  it('validates the choice and survives import checks', () => {
+    expect(checkParam(p.params[0], 'Media')).toBeNull();
+    expect(checkParam(p.params[0], 'Other')).toMatch(/one of Media, Control/);
+    expect(isPrefab(p)).toBe(true);
+    expect(isPrefab({ ...p, params: [{ ...p.params[0], options: [1, 2] }] })).toBe(false);
+  });
+});
+
 describe('prefabFromBranch', () => {
   it('turns MV1 into a reusable block that recreates MV2', () => {
     const doc = parse(SAMPLE).doc;

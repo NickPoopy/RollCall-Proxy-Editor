@@ -22,6 +22,28 @@ Kahuna
 function ParamField({ p, value, onChange }: { p: PrefabParam; value: Value; onChange: (v: Value) => void }) {
   const err = checkParam(p, value);
   const id = `pf-${p.key}`;
+  if (p.type === 'choice') {
+    return (
+      <div className="pf-row pf-choice">
+        <span className="pf-label" id={`${id}-label`}>{p.label}</span>
+        <div className="segmented" role="radiogroup" aria-labelledby={`${id}-label`}>
+          {(p.options ?? []).map((o) => (
+            <button
+              key={o}
+              type="button"
+              role="radio"
+              aria-checked={String(value) === o}
+              className={String(value) === o ? 'on' : ''}
+              onClick={() => onChange(o)}
+            >
+              {o}
+            </button>
+          ))}
+        </div>
+        {p.hint && <div className="hint">{p.hint}</div>}
+      </div>
+    );
+  }
   if (p.type === 'scheme') {
     return (
       <div className="pf-row">
@@ -241,7 +263,18 @@ export function OutlineDialog({
             {custom.length === 0 ? (
               <p className="muted small tb-empty">None yet. Use “Save as prefab…” on any branch, or copy a built-in with ⧉.</p>
             ) : (
-              <ul className="tb-list">{custom.map(item)}</ul>
+              <>
+                <ul className="tb-list">{custom.filter((p) => !p.group?.trim()).map(item)}</ul>
+                {[...new Set(custom.map((p) => p.group?.trim()).filter((g): g is string => !!g))].map((g) => (
+                  // Open the folder that holds the chosen prefab.
+                  <details key={g} className="tb-folder" open={custom.some((p) => p.group?.trim() === g && p.id === prefab?.id)}>
+                    <summary>
+                      <span className="tb-folder-name">📁 {g}</span>
+                    </summary>
+                    <ul className="tb-list">{custom.filter((p) => p.group?.trim() === g).map(item)}</ul>
+                  </details>
+                ))}
+              </>
             )}
             <div className="tb-io">
               <button className="small" onClick={importFile} title="Import prefabs from a .json file">Import…</button>

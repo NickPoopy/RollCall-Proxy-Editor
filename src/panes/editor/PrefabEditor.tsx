@@ -10,6 +10,7 @@ const TYPES: [ParamType, string][] = [
   ['ip', 'IP address'],
   ['bool', 'Yes/No'],
   ['scheme', 'IP scheme'],
+  ['choice', 'Choice'],
 ];
 
 function coerce(type: ParamType, v: string): PrefabParam['default'] {
@@ -98,7 +99,25 @@ export function PrefabEditor({ initial, onClose, onSaved }: { initial: Prefab; o
                   </select>
                 </td>
                 <td>
-                  {p.type === 'scheme' ? (
+                  {p.type === 'choice' ? (
+                    <div className="choice-edit">
+                      <input
+                        value={(p.options ?? []).join(', ')}
+                        placeholder="Options, e.g. Media, Control"
+                        onChange={(e) => {
+                          const options = e.target.value.split(',').map((s) => s.trim()).filter(Boolean);
+                          setParam(i, { options, default: options.includes(String(p.default)) ? p.default : (options[0] ?? '') });
+                        }}
+                        aria-label="Options"
+                        title="Comma-separated options"
+                      />
+                      <select value={String(p.default)} onChange={(e) => setParam(i, { default: e.target.value })} aria-label="Default">
+                        {(p.options ?? []).map((o) => (
+                          <option key={o} value={o}>{o}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : p.type === 'scheme' ? (
                     <select value={String(p.default)} onChange={(e) => setParam(i, { default: e.target.value })} aria-label="Default">
                       <option value="flat">flat</option>
                       <option value="/31">/31</option>

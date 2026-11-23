@@ -14,7 +14,7 @@ const SCHEME_PARAM: PrefabParam = {
   hint: 'L3: each device gets its own /31 or /30',
 };
 
-export type ParamType = 'int' | 'text' | 'ip' | 'bool' | 'scheme';
+export type ParamType = 'int' | 'text' | 'ip' | 'bool' | 'scheme' | 'choice';
 
 export interface PrefabParam {
   key: string;
@@ -24,6 +24,8 @@ export interface PrefabParam {
   min?: number;
   max?: number;
   hint?: string;
+  /** For 'choice': the options to pick from; the template sees the chosen text. */
+  options?: string[];
 }
 
 export interface Prefab {
@@ -58,6 +60,10 @@ export function checkParam(p: PrefabParam, v: Value): string | null {
     }
   }
   if (p.type === 'scheme' && !isScheme(String(v))) return `${p.label}: choose flat, /31 or /30`;
+  if (p.type === 'choice') {
+    if (!p.options?.length) return `${p.label}: has no options to choose from`;
+    if (!p.options.includes(String(v))) return `${p.label}: choose one of ${p.options.join(', ')}`;
+  }
   return null;
 }
 
@@ -273,6 +279,7 @@ export function isPrefab(x: unknown): x is Prefab {
     typeof p.body === 'string' &&
     (p.group === undefined || typeof p.group === 'string') &&
     Array.isArray(p.params) &&
-    p.params.every((q) => typeof q.key === 'string' && typeof q.label === 'string' && ['int', 'text', 'ip', 'bool', 'scheme'].includes(q.type))
+    p.params.every((q) => typeof q.key === 'string' && typeof q.label === 'string' && ['int', 'text', 'ip', 'bool', 'scheme', 'choice'].includes(q.type) &&
+      (q.options === undefined || (Array.isArray(q.options) && q.options.every((o) => typeof o === 'string'))))
   );
 }
