@@ -90,6 +90,7 @@ export function OutlineDialog({
   parentName,
   scheme,
   initialPrefabId,
+  initialValues,
   onClose,
 }: {
   parent: NetAddr;
@@ -97,6 +98,8 @@ export function OutlineDialog({
   scheme: Scheme;
   /** Open with this prefab already chosen (from a toolbox drop). */
   initialPrefabId?: string;
+  /** Settings to start that prefab with, e.g. a choice picked on its toolbox chip. */
+  initialValues?: Vars;
   onClose: () => void;
 }) {
   const doc = useStore((s) => s.doc);
@@ -126,11 +129,12 @@ export function OutlineDialog({
     }
   };
 
-  const choose = (p: Prefab) => {
+  const choose = (p: Prefab, preset?: Vars) => {
     if (handEdited && !window.confirm('Replace your hand-edited outline with this prefab?')) return;
     const vals = defaultValues(p);
     // Scheme settings start from the branch's IP scheme.
     for (const param of p.params) if (param.type === 'scheme') vals[param.key] = scheme;
+    Object.assign(vals, preset);
     setPrefab(p);
     setValues(vals);
     regenerate(p, vals);
@@ -140,7 +144,7 @@ export function OutlineDialog({
   useEffect(() => {
     if (!initialPrefabId) return;
     const p = [...BUILTIN_PREFABS, ...usePrefabs.getState().custom].find((x) => x.id === initialPrefabId);
-    if (p) choose(p);
+    if (p) choose(p, initialValues);
   }, [initialPrefabId]); // run once on open
 
   const setValue = (key: string, v: Value) => {

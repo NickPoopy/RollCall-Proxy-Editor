@@ -1,24 +1,32 @@
 import { create } from 'zustand';
 import { depthOf, MAX_DEPTH, ROOT } from '../model/address';
+import { applyOutline, parseOutline } from '../model/bulk';
 import { schemeFor, suggestDevice } from '../model/ipscheme';
-import { addChild, addIpShare } from '../model/ops';
+import { addChild, addIpShare, OpError } from '../model/ops';
+import { BUILTIN_PREFABS, checkParam, defaultValues, renderPrefab, type Prefab } from '../model/prefabs';
+import { TemplateError, type Vars } from '../model/template';
 import type { NetAddr } from '../model/types';
+import { usePrefabs } from './prefabs';
 import { schemesFor } from './schemes';
 import { useStore } from './store';
 
 /**
  * Toolbox items. "folder" and "device" are added straight away. The others open
- * a dialog aimed at the net they were dropped on.
+ * a dialog aimed at the net they were dropped on, unless a preset (from a choice
+ * chip such as Media / Control) fills in everything the prefab needs.
  */
 export type ToolId = 'folder' | 'device' | 'bulk' | 'outline' | `prefab:${string}`;
 
 /** The tool currently being dragged out of the toolbox (null when not dragging). */
-export const useToolDrag = create<{ tool: ToolId | null; set: (t: ToolId | null) => void }>((set) => ({
+export const useToolDrag = create<{ tool: ToolId | null; preset?: Vars; set: (t: ToolId | null, preset?: Vars) => void }>((set) => ({
   tool: null,
-  set: (tool) => set({ tool }),
+  preset: undefined,
+  set: (tool, preset) => set({ tool, preset }),
 }));
 
-export type DialogRequest = { kind: 'bulk'; parent: NetAddr } | { kind: 'outline'; parent: NetAddr; prefabId?: string };
+export type DialogRequest =
+  | { kind: 'bulk'; parent: NetAddr }
+  | { kind: 'outline'; parent: NetAddr; prefabId?: string; values?: Vars };
 
 /** Dialogs opened from the toolbox, shown by <ToolDialogHost/>. */
 export const useToolDialog = create<{ open: DialogRequest | null; show: (r: DialogRequest | null) => void }>((set) => ({
@@ -36,8 +44,48 @@ export function canHoldChildren(addr: NetAddr): boolean {
   return depthOf(addr) < MAX_DEPTH;
 }
 
+export function findPrefab(id: string): Prefab | undefined {
+  return [...BUILTIN_PREFABS, ...usePrefabs.getState().custom].find((p) => p.id === id);
+}
+
+/** A prefab can be added without its dialog when every setting is a choice that the preset answers. */
+export function isQuickAdd(p: Prefab, preset?: Vars): boolean {
+  return !!preset && p.params.length > 0 && p.params.every((x) => x.type === 'choice' && checkParam(x, preset[x.key] ?? x.default) === null);
+}
+
+/** Render a prefab and add it under `parent` in one undo step. */
+function quickAdd(p: Prefab, parent: NetAddr, preset: Vars) {
+  const st = useStore.getState();
+  let text: string;
+  try {
+    text = renderPrefab(p, { ...defaultValues(p), ...preset });
+  } catch (e) {
+    if (e instanceof TemplateError) return st.showToast(`${p.name}: ${e.message}`);
+    throw e;
+  }
+  const { rows, errors } = parseOutline(text);
+  if (errors.length) return st.showToast(`${p.name}: line ${errors[0].line + 1}: ${errors[0].message}`);
+  let plan: ReturnType<typeof applyOutline>['plan'] = [];
+  const ok = st.apply((d) => {
+    const r = applyOutline(d, parent, rows, { defaultPort: '2050', merge: true });
+    plan = r.plan;
+    return r.doc;
+  });
+  if (!ok) return;
+  const nets = plan.filter((x) => x.status === 'new').length;
+  const devices = plan.filter((x) => x.device?.status === 'new').length;
+  const label = Object.values(preset).join(' ');
+  if (nets + devices === 0) {
+    st.showToast(`${p.name} ${label} is already there; nothing added.`, 'info');
+    return;
+  }
+  const first = plan.find((x) => x.status === 'new') ?? plan[0];
+  if (first) st.select(first.addr, 'editor');
+  st.showToast(`Added ${p.name} ${label}: ${nets} net${nets === 1 ? '' : 's'}, ${devices} device${devices === 1 ? '' : 's'}. Ctrl+Z to undo.`, 'info');
+}
+
 /** Run a toolbox item against a target net (the drop target, or the selected net when clicked). */
-export function runTool(tool: ToolId, target: NetAddr | null) {
+export function runTool(tool: ToolId, target: NetAddr | null, preset?: Vars) {
   const st = useStore.getState();
   const parent = target ?? ROOT;
   if (!canHoldChildren(parent)) {
@@ -61,7 +109,19 @@ export function runTool(tool: ToolId, target: NetAddr | null) {
     return;
   }
 
-  if (tool === 'bulk') useToolDialog.getState().show({ kind: 'bulk', parent });
-  else if (tool === 'outline') useToolDialog.getState().show({ kind: 'outline', parent });
-  else useToolDialog.getState().show({ kind: 'outline', parent, prefabId: tool.slice('prefab:'.length) });
+  if (tool === 'bulk') return useToolDialog.getState().show({ kind: 'bulk', parent });
+  if (tool === 'outline') return useToolDialog.getState().show({ kind: 'outline', parent });
+
+  const id = tool.slice('prefab:'.length);
+  const p = findPrefab(id);
+  if (p && isQuickAdd(p, preset)) {
+    try {
+      quickAdd(p, parent, preset!);
+    } catch (e) {
+      if (e instanceof OpError) st.showToast(e.message);
+      else throw e;
+    }
+    return;
+  }
+  useToolDialog.getState().show({ kind: 'outline', parent, prefabId: id, values: preset });
 }

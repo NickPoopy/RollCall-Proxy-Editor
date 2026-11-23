@@ -158,12 +158,12 @@ const Item = memo(function Item({
           e.preventDefault();
           clearTimeout(expandTimer.current);
           expandTimer.current = undefined;
-          const tool = useToolDrag.getState().tool;
+          const { tool, preset } = useToolDrag.getState();
           if (tool) {
             useToolDrag.getState().set(null);
             drag.setHint(null);
             drag.expand(node.addr);
-            runTool(tool, node.addr);
+            runTool(tool, node.addr, preset);
             return;
           }
           const src = drag.dragging;

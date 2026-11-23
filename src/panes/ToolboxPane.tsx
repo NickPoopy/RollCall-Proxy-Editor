@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ROOT } from '../model/address';
 import { schemeFor } from '../model/ipscheme';
 import { BUILTIN_PREFABS, type Prefab } from '../model/prefabs';
+import type { Vars } from '../model/template';
 import { downloadText, usePrefabs } from '../state/prefabs';
 import { useFileSchemes } from '../state/schemes';
 import { useStore } from '../state/store';
@@ -16,30 +17,65 @@ interface CardProps {
   title: string;
   hint: string;
   actions?: React.ReactNode;
+  /** Prefab behind the card; its first Choice setting is shown as draggable chips. */
+  prefab?: Prefab;
 }
 
-function ToolCard({ tool, icon, title, hint, actions }: CardProps) {
+function startDrag(e: React.DragEvent, tool: ToolId, preset?: Vars) {
+  e.stopPropagation();
+  e.dataTransfer.effectAllowed = 'copy';
+  e.dataTransfer.setData('text/plain', tool);
+  useToolDrag.getState().set(tool, preset);
+}
+
+function ToolCard({ tool, icon, title, hint, actions, prefab }: CardProps) {
   const selected = useStore((s) => s.selected);
+  const choice = prefab?.params.find((p) => p.type === 'choice' && p.options?.length);
+  const run = () => runTool(tool, selected);
   return (
     <li className="tool-card-wrap">
-      <button
+      <div
         className="tool-card"
+        role="button"
+        tabIndex={0}
         draggable
-        onDragStart={(e) => {
-          e.dataTransfer.effectAllowed = 'copy';
-          e.dataTransfer.setData('text/plain', tool);
-          useToolDrag.getState().set(tool);
-        }}
+        onDragStart={(e) => startDrag(e, tool)}
         onDragEnd={() => useToolDrag.getState().set(null)}
-        onClick={() => runTool(tool, selected)}
-        title={`${hint}\n\nDrag onto a net in the tree, or click to add to the selected net.`}
+        onClick={run}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+          e.preventDefault();
+          run();
+        }}
+        title={`${hint}\n\nDrag onto a net in the tree, or click to add to the selected net.${choice ? `\nOr drag one of the ${choice.label} options to add just that.` : ''}`}
       >
         <span className="tool-icon" aria-hidden="true">{icon}</span>
         <span className="tool-text">
           <span className="tool-title">{title}</span>
           <span className="tool-hint">{hint}</span>
+          {choice && (
+            <span className="tool-chips" aria-label={`${choice.label} options`}>
+              {choice.options!.map((o) => (
+                <button
+                  key={o}
+                  type="button"
+                  className="tool-chip"
+                  draggable
+                  onDragStart={(e) => startDrag(e, tool, { [choice.key]: o })}
+                  onDragEnd={() => useToolDrag.getState().set(null)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    runTool(tool, selected, { [choice.key]: o });
+                  }}
+                  title={`Drag onto a net to add ${title} ${o}, or click to add it to the selected net`}
+                >
+                  {o}
+                </button>
+              ))}
+            </span>
+          )}
         </span>
-      </button>
+      </div>
       {actions && <span className="tool-actions">{actions}</span>}
     </li>
   );
@@ -73,6 +109,7 @@ export function ToolboxPane() {
       icon="★"
       title={p.name}
       hint={p.description || 'Your prefab'}
+      prefab={p}
       actions={
         <>
           <button className="small tb-act" title="Edit" onClick={() => setEditing(p)}>✎</button>
@@ -147,6 +184,7 @@ export function ToolboxPane() {
               icon="▦"
               title={p.name}
               hint={p.description}
+              prefab={p}
               actions={
                 <button className="small tb-act" title="Copy to My prefabs to customise" onClick={() => newPrefab(p)}>
                   ⧉
@@ -226,5 +264,5 @@ export function ToolDialogHost() {
   const name = netNames.find((n) => n.addr === req.parent)?.name ?? (req.parent === ROOT ? 'the top level' : req.parent);
   const scheme = schemeFor(schemes, req.parent);
   if (req.kind === 'bulk') return <BulkAddDialog parent={req.parent} parentName={name} scheme={scheme} onClose={close} />;
-  return <OutlineDialog parent={req.parent} parentName={name} scheme={scheme} initialPrefabId={req.prefabId} onClose={close} />;
+  return <OutlineDialog parent={req.parent} parentName={name} scheme={scheme} initialPrefabId={req.prefabId} initialValues={req.values} onClose={close} />;
 }
