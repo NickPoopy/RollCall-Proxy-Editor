@@ -56,7 +56,8 @@ export function EditorPane() {
             </div>
             <NodeTree tree={tree} filter={filter} command={treeCmd} />
             {node ? (
-              <NodeDetails node={node} />
+              // Fresh panel per net, so its fields start with that net's values (and focus/selection isn't undone).
+              <NodeDetails key={node.addr} node={node} />
             ) : (
               <div className="details muted">Select a net to edit it. Select the root to add top-level items.</div>
             )}

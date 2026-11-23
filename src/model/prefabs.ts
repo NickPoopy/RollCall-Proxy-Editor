@@ -34,6 +34,8 @@ export interface Prefab {
   /** Outline template; see template.ts for the syntax. */
   body: string;
   builtin?: boolean;
+  /** Toolbox folder to show it in, e.g. "My team". */
+  group?: string;
 }
 
 export function defaultValues(p: Prefab): Vars {
@@ -269,6 +271,7 @@ export function isPrefab(x: unknown): x is Prefab {
     typeof p.id === 'string' &&
     typeof p.name === 'string' &&
     typeof p.body === 'string' &&
+    (p.group === undefined || typeof p.group === 'string') &&
     Array.isArray(p.params) &&
     p.params.every((q) => typeof q.key === 'string' && typeof q.label === 'string' && ['int', 'text', 'ip', 'bool', 'scheme'].includes(q.type))
   );

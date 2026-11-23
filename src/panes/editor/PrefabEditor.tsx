@@ -23,10 +23,11 @@ function coerce(type: ParamType, v: string): PrefabParam['default'] {
 export function PrefabEditor({ initial, onClose, onSaved }: { initial: Prefab; onClose: () => void; onSaved?: (p: Prefab) => void }) {
   const [name, setName] = useState(initial.name);
   const [description, setDescription] = useState(initial.description);
+  const [group, setGroup] = useState(initial.group ?? '');
   const [params, setParams] = useState<PrefabParam[]>(initial.params);
   const [body, setBody] = useState(initial.body);
 
-  const draft: Prefab = { id: initial.id, name, description, params, body };
+  const draft: Prefab = { id: initial.id, name, description, params, body, group: group.trim() || undefined };
   const keyErrors = params
     .map((p, i) => (!/^[A-Za-z_]\w*$/.test(p.key) ? `Setting ${i + 1}: key must be letters/numbers, starting with a letter` : params.findIndex((q) => q.key === p.key) !== i ? `Setting “${p.key}” is listed twice` : null))
     .filter((x): x is string => !!x);
@@ -63,6 +64,11 @@ export function PrefabEditor({ initial, onClose, onSaved }: { initial: Prefab; o
           <input id="pe-name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
           <label htmlFor="pe-desc">Description</label>
           <input id="pe-desc" value={description} onChange={(e) => setDescription(e.target.value)} />
+          <label htmlFor="pe-group">Folder</label>
+          <div>
+            <input id="pe-group" value={group} placeholder="Optional, e.g. My team" onChange={(e) => setGroup(e.target.value)} />
+            <div className="hint">Prefabs with the same folder name are grouped together in the Toolbox.</div>
+          </div>
         </div>
 
         <div className="section-title" style={{ marginTop: 14 }}>

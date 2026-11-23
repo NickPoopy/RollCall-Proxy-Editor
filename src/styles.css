@@ -446,3 +446,14 @@ select { background: var(--input-bg); border: 1px solid var(--border); border-ra
 .tool-title { font-weight: 600; }
 .tool-hint { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tool-actions { display: flex; flex-direction: column; justify-content: center; }
+.tb-folder { margin: 0 0 6px; border: 1px solid var(--border); border-radius: 5px; background: var(--panel); }
+.tb-folder > summary {
+  display: flex; align-items: center; gap: 8px; padding: 5px 8px; cursor: pointer; user-select: none; list-style: none;
+}
+.tb-folder > summary::-webkit-details-marker { display: none; }
+.tb-folder > summary::before { content: '▸'; color: var(--muted); font-size: 10px; }
+.tb-folder[open] > summary::before { content: '▾'; }
+.tb-folder > summary:hover { background: var(--sel-line); }
+.tb-folder-name { font-weight: 600; }
+.tb-folder-actions { margin-left: auto; display: flex; gap: 2px; }
+.tb-folder > .tool-list { padding: 0 6px 6px; margin: 0; }

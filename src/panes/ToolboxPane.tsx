@@ -55,6 +55,39 @@ export function ToolboxPane() {
   const targetName = netNames.find((n) => n.addr === target)?.name ?? (target === ROOT ? 'the top level' : target);
   const blocked = !canHoldChildren(target);
 
+  // My prefabs, split into loose ones and named folders (in first-seen order).
+  const ungrouped = custom.filter((p) => !p.group?.trim());
+  const groups: [string, Prefab[]][] = [];
+  for (const p of custom) {
+    const g = p.group?.trim();
+    if (!g) continue;
+    const entry = groups.find(([name]) => name === g);
+    if (entry) entry[1].push(p);
+    else groups.push([g, [p]]);
+  }
+
+  const customCard = (p: Prefab) => (
+    <ToolCard
+      key={p.id}
+      tool={`prefab:${p.id}`}
+      icon="★"
+      title={p.name}
+      hint={p.description || 'Your prefab'}
+      actions={
+        <>
+          <button className="small tb-act" title="Edit" onClick={() => setEditing(p)}>✎</button>
+          <button
+            className="small tb-act danger"
+            title="Delete"
+            onClick={() => window.confirm(`Delete prefab “${p.name}”?`) && usePrefabs.getState().remove(p.id)}
+          >
+            ✕
+          </button>
+        </>
+      }
+    />
+  );
+
   const newPrefab = (from?: Prefab) =>
     setEditing({
       id: `custom-${Date.now().toString(36)}`,
@@ -128,31 +161,42 @@ export function ToolboxPane() {
           <button className="small" onClick={() => newPrefab()} title="Write a new prefab">+ New</button>
         </div>
         {custom.length === 0 ? (
-          <p className="muted small tb-empty">None yet. Use “Save as prefab…” on any branch, or copy a built-in with ⧉.</p>
+          <p className="muted small tb-empty">None yet. Use “Save as prefab…” on any branch, copy a built-in with ⧉, or Import a pack.</p>
         ) : (
-          <ul className="tool-list">
-            {custom.map((p) => (
-              <ToolCard
-                key={p.id}
-                tool={`prefab:${p.id}`}
-                icon="★"
-                title={p.name}
-                hint={p.description || 'Your prefab'}
-                actions={
-                  <>
-                    <button className="small tb-act" title="Edit" onClick={() => setEditing(p)}>✎</button>
+          <>
+            <ul className="tool-list">{ungrouped.map(customCard)}</ul>
+            {groups.map(([group, items]) => (
+              <details key={group} className="tb-folder">
+                <summary>
+                  <span className="tb-folder-name">📁 {group}</span>
+                  <span className="muted small">{items.length}</span>
+                  <span className="tb-folder-actions">
+                    <button
+                      className="small tb-act"
+                      title={`Export the ${group} folder to a .json file`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        downloadText(usePrefabs.getState().exportJson(items.map((p) => p.id)), `${group.replace(/[^\w-]+/g, '-')}-prefabs.json`);
+                      }}
+                    >
+                      ⤓
+                    </button>
                     <button
                       className="small tb-act danger"
-                      title="Delete"
-                      onClick={() => window.confirm(`Delete prefab “${p.name}”?`) && usePrefabs.getState().remove(p.id)}
+                      title={`Delete the ${group} folder and its ${items.length} prefabs`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (window.confirm(`Delete the “${group}” folder and its ${items.length} prefabs?`)) items.forEach((p) => usePrefabs.getState().remove(p.id));
+                      }}
                     >
                       ✕
                     </button>
-                  </>
-                }
-              />
+                  </span>
+                </summary>
+                <ul className="tool-list">{items.map(customCard)}</ul>
+              </details>
             ))}
-          </ul>
+          </>
         )}
         <div className="tb-io">
           <button className="small" onClick={importFile} title="Import prefabs from a .json file">Import…</button>

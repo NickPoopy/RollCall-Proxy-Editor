@@ -38,10 +38,14 @@ export function NodeDetails({ node }: { node: TreeNode }) {
   const focusName = useFocusName((s) => s.addr === node.addr);
   useEffect(() => {
     if (!focusName) return;
-    const el = document.getElementById('nd-name') as HTMLInputElement | null;
-    el?.focus();
-    el?.select();
-    useFocusName.getState().set(null);
+    // Wait a frame: the name field picks up the new net's name in its own update, which would undo the selection.
+    // Clear the request only afterwards, so the re-render it causes can't cancel the focus.
+    requestAnimationFrame(() => {
+      const el = document.getElementById('nd-name') as HTMLInputElement | null;
+      el?.focus();
+      el?.select();
+      useFocusName.getState().set(null);
+    });
   }, [focusName]);
 
   const onAddDevice = () => {
