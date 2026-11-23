@@ -173,10 +173,6 @@
 
 :root {
   --globe: #2f8f5b;
-  --rc-bg: #3c3c3c;
-  --rc-text: #f0f0f0;
-  --rc-line: #b8b8b8;
-  --rc-sel: #1a1a1a;
   --mono: 'Cascadia Mono', Consolas, 'Courier New', monospace;
   --ui: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
@@ -432,27 +428,21 @@ select { background: var(--input-bg); border: 1px solid var(--border); border-ra
   background: var(--overlay); border: 3px dashed var(--accent); font-size: 20px;
 }
 
-/* ---------- RollCall-style preview ---------- */
-.rc-tree { background: var(--rc-bg); color: var(--rc-text); font: 12px/1.25 Tahoma, 'Segoe UI', sans-serif; padding: 6px 4px 12px; }
-.rc-tree .empty { color: #bbb; }
-.rc-tree ul { list-style: none; margin: 0; padding-left: 20px; }
-.rc-tree ul.rc-root { padding-left: 4px; }
-.rc-tree li { position: relative; }
-/* Dotted connectors like RollCall's tree */
-.rc-tree ul ul > li::before {
-  content: ''; position: absolute; left: -11px; top: 0; bottom: 0;
-  border-left: 1px dotted var(--rc-line);
+/* ---------- Toolbox pane ---------- */
+.toolbox-pane { padding: 6px 8px 12px; overflow-x: hidden; }
+.tool-list > li { min-width: 0; }
+.tb-target { margin: 2px 2px 8px; color: var(--muted); }
+.tb-target strong { color: var(--text); }
+.tool-list { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 4px; }
+.tool-card-wrap { display: flex; align-items: stretch; gap: 2px; min-width: 0; }
+.tool-card {
+  flex: 1; min-width: 0; display: flex; gap: 8px; align-items: center; text-align: left;
+  padding: 6px 8px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 5px; cursor: grab;
 }
-.rc-tree ul ul > li:last-child::before { bottom: auto; height: 10px; }
-.rc-tree ul ul > li::after {
-  content: ''; position: absolute; left: -11px; top: 10px; width: 9px;
-  border-top: 1px dotted var(--rc-line);
-}
-.rc-row { display: inline-flex; align-items: center; gap: 3px; padding: 1px 4px 1px 0; cursor: default; white-space: nowrap; user-select: none; }
-.rc-row:hover .rc-label { text-decoration: underline dotted; }
-.rc-selected { background: var(--rc-sel); }
-.rc-unnamed .rc-label { color: #ffd27a; font-style: italic; }
-.rc-device .rc-label { color: #cfd8e8; }
-.rc-toggle { width: 10px; font-size: 10px; color: #ddd; text-align: center; cursor: pointer; }
-.rc-toggle-none { cursor: default; }
-.rc-icon { flex: none; }
+.tool-card:hover:not(:disabled) { border-color: var(--accent); background: var(--sel-line); }
+.tool-card:active { cursor: grabbing; }
+.tool-icon { flex: none; width: 22px; text-align: center; font-size: 15px; }
+.tool-text { display: flex; flex-direction: column; min-width: 0; }
+.tool-title { font-weight: 600; }
+.tool-hint { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tool-actions { display: flex; flex-direction: column; justify-content: center; }

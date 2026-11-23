@@ -5,6 +5,7 @@ import { labelOf, type Tree, type TreeNode } from '../../model/tree';
 import type { NetAddr } from '../../model/types';
 import { useStore } from '../../state/store';
 import { useSchemes } from '../../state/schemes';
+import { canHoldChildren, runTool, useToolDrag } from '../../state/toolbox';
 
 interface Props {
   tree: Tree;
@@ -113,11 +114,29 @@ const Item = memo(function Item({
           drag.setHint(null);
         }}
         onDragOver={(e) => {
+          // Something dragged in from the toolbox always goes *into* the net it's dropped on.
+          const tool = useToolDrag.getState().tool;
+          if (tool) {
+            if (!canHoldChildren(node.addr)) {
+              drag.setHint(null);
+              return;
+            }
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            if (hint !== 'into') drag.setHint({ addr: node.addr, zone: 'into' });
+            if (hasKids && !open && !expandTimer.current) {
+              expandTimer.current = setTimeout(() => {
+                drag.expand(node.addr);
+                expandTimer.current = undefined;
+              }, 650);
+            }
+            return;
+          }
           const src = drag.dragging;
           if (!src) return;
           const zone = zoneAt(e);
           if (!dropTarget(src, node.addr, zone)) {
-            if (hint) drag.setHint(null);
+            drag.setHint(null);
             return;
           }
           e.preventDefault();
@@ -139,6 +158,14 @@ const Item = memo(function Item({
           e.preventDefault();
           clearTimeout(expandTimer.current);
           expandTimer.current = undefined;
+          const tool = useToolDrag.getState().tool;
+          if (tool) {
+            useToolDrag.getState().set(null);
+            drag.setHint(null);
+            drag.expand(node.addr);
+            runTool(tool, node.addr);
+            return;
+          }
           const src = drag.dragging;
           drag.setDragging(null);
           drag.setHint(null);
@@ -203,6 +230,12 @@ export function NodeTree({ tree, filter, command }: Props) {
   }, [command]); // only react to clicks, not to tree edits
   const [dragging, setDragging] = useState<NetAddr | null>(null);
   const [hint, setHint] = useState<DropHint | null>(null);
+  const toolDragging = useToolDrag((s) => s.tool !== null);
+
+  // A toolbox drag that ends outside the tree leaves no drop marker behind.
+  useEffect(() => {
+    if (!toolDragging) setHint(null);
+  }, [toolDragging]);
   const selected = useStore((s) => s.selected);
   const issues = useStore((s) => s.issues);
 
@@ -267,12 +300,12 @@ export function NodeTree({ tree, filter, command }: Props) {
   return (
     <Drag.Provider value={ctx}>
       <div
-        className={`node-tree${dragging ? ' is-dragging' : ''}`}
+        className={`node-tree${dragging || toolDragging ? ' is-dragging' : ''}`}
         role="tree"
         onDragLeave={(e) => e.currentTarget === e.target && setHint(null)}
         onDragOver={(e) => {
           // Scroll when dragging near the top or bottom edge.
-          if (!dragging) return;
+          if (!dragging && !toolDragging) return;
           const el = e.currentTarget;
           const r = el.getBoundingClientRect();
           const edge = 24;

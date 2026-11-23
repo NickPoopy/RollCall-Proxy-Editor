@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useFocusName } from '../../state/toolbox';
 import { childDigit, depthOf, displayAddr, inSubtree, isValidAddr, MAX_DEPTH, ROOT } from '../../model/address';
 import { addChild, addIpShare, moveSubtree, rebaseAddr, removeIpShare, removeSubtree, setNetName, shiftNet, updateIpShare } from '../../model/ops';
 import { SCHEME_LABEL, SCHEMES, schemeFor, schemeSource, suggestDevice, type Scheme } from '../../model/ipscheme';
@@ -32,6 +33,16 @@ export function NodeDetails({ node }: { node: TreeNode }) {
   const explicit = schemes[node.addr] ?? '';
   const source = schemeSource(schemes, node.addr);
   const sourceName = source ? (netNames.find((n) => n.addr === source)?.name ?? source) : '';
+
+  // Just added from the toolbox: put the cursor in the name so it can be typed straight away.
+  const focusName = useFocusName((s) => s.addr === node.addr);
+  useEffect(() => {
+    if (!focusName) return;
+    const el = document.getElementById('nd-name') as HTMLInputElement | null;
+    el?.focus();
+    el?.select();
+    useFocusName.getState().set(null);
+  }, [focusName]);
 
   const onAddDevice = () => {
     const doc = useStore.getState().doc;

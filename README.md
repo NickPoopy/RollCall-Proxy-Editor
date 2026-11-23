@@ -6,13 +6,21 @@ Edit RollCall proxy configuration files without fighting the text format.
 
 ![Screenshot](docs/screenshot.png)
 
-The window has three panes, all kept in sync:
+The window has three panes:
 
-| Raw text | Editor | RollCall preview |
+| Raw text | Editor | Toolbox |
 |---|---|---|
-| The actual file. Paste, type, or open one. Errors and warnings are marked in the gutter. | A friendly tree with forms for names, addresses and devices, plus tables for all devices and settings. | A mock-up of the tree RollCall will show, using the same `Name NNNN:DD:00 (version)` labels. |
+| The actual file. Paste, type, or open one. Errors and warnings are marked in the gutter. | A friendly tree with forms for names, addresses and devices, plus tables for all devices and settings. | Building blocks: drag one onto a net in the tree to add it inside that net. |
 
-Click a net in any pane and it's highlighted in the other two.
+Click a net in the tree or the text and it's highlighted in the other.
+
+### Toolbox
+
+Drag a card onto any net in the Tree tab, or click a card to add to the selected net:
+
+- **Folder** and **Device** are added at once and open ready to rename. A device gets the next free IP in that branch, following its IP scheme.
+- **Several children…**, **Outline / Excel paste…**, the built-in **prefabs** and **My prefabs** open their settings dialog, aimed at the net you dropped on.
+- **My prefabs**: ✎ edit, ✕ delete, ⧉ copy a built-in to customise it, **Import/Export** to share them as a `.json` file.
 
 ## Features
 
@@ -39,7 +47,7 @@ Click a net in any pane and it's highlighted in the other two.
 - **IpShare numbering**: RollCall needs `IpShare0, 1, 2…` in order with no gaps or repeats. Every edit made through the editor rewrites them in sequence automatically. Gaps from hand-editing the raw text are flagged with a **Renumber** button, and Save always renumbers first.
 - **Validation**: duplicate addresses, unnamed parents, bad IPs/ports, more than 15 children, duplicate IP:port.
 - **Undo / redo**, plus a draft autosave in the browser so a closed tab doesn't lose work.
-- **Themes**: Default Dark, plus Kimbie Dark, Solarized Dark, Solarized Light and Monokai Dimmed based on the VS Code themes. Pick one from **Theme** in the toolbar; the choice is remembered. The RollCall preview keeps RollCall's own colours so it still looks like the real thing.
+- **Themes**: Default Dark, plus Kimbie Dark, Solarized Dark, Solarized Light and Monokai Dimmed based on the VS Code themes. Pick one from **Theme** in the toolbar; the choice is remembered.
 - Everything runs locally in your browser. Files are never uploaded anywhere.
 
 ## How the proxy file maps to the tree
@@ -54,7 +62,7 @@ Click a net in any pane and it's highlighted in the other two.
 
 - Net addresses are **4 hex digits**, one digit per tree level. `0` means "level not used", so a net can have up to 15 children (1–F), and the tree is at most 4 levels deep. `0000` is the root/system name.
 - RollCall shows each net as `parent:DD:00`, where `DD` is the net's own digit.
-- `IpShareN=ip1,port1,NET,ip2,port2,ip3,port3,` in `[Combiner Services]` attaches the device at those IP addresses to net `NET`. `-` means an address slot is unused. RollCall then shows the device (with its own name, address and version) under that net. The preview shows a placeholder row for it, because the real details come from the device.
+- `IpShareN=ip1,port1,NET,ip2,port2,ip3,port3,` in `[Combiner Services]` attaches the device at those IP addresses to net `NET`. `-` means an address slot is unused. RollCall then shows the device (with its own name, address and version) under that net.
 
 ## Outline format (Paste outline…)
 
@@ -102,7 +110,7 @@ Stack: React + TypeScript + Vite, Zustand, CodeMirror 6, Vitest.
 ```
 src/model/    file format: parse, serialize, address math, tree, validation, edit operations (pure, unit-tested)
 src/state/    app store (undo, selection, autosave), file open/save, templates
-src/panes/    RawTextPane, EditorPane (+ editor/*), PreviewPane
+src/panes/    RawTextPane, EditorPane (+ editor/*), ToolboxPane
 ```
 
 `samples/example-proxy.txt` is an anonymized real proxy file, used by the tests and the **Example** button. Put real files in `samples/private/` (git-ignored). The tests also check that they round-trip.

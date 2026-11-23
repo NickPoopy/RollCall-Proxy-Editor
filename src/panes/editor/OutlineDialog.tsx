@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { applyOutline, exportOutline, parseOutline } from '../../model/bulk';
 import { OpError } from '../../model/ops';
 import { isValidPort } from '../../model/validate';
@@ -63,7 +63,20 @@ function ParamField({ p, value, onChange }: { p: PrefabParam; value: Value; onCh
   );
 }
 
-export function OutlineDialog({ parent, parentName, scheme, onClose }: { parent: NetAddr; parentName: string; scheme: Scheme; onClose: () => void }) {
+export function OutlineDialog({
+  parent,
+  parentName,
+  scheme,
+  initialPrefabId,
+  onClose,
+}: {
+  parent: NetAddr;
+  parentName: string;
+  scheme: Scheme;
+  /** Open with this prefab already chosen (from a toolbox drop). */
+  initialPrefabId?: string;
+  onClose: () => void;
+}) {
   const doc = useStore((s) => s.doc);
   const custom = usePrefabs((s) => s.custom);
   const [text, setText] = useState('');
@@ -100,6 +113,13 @@ export function OutlineDialog({ parent, parentName, scheme, onClose }: { parent:
     setValues(vals);
     regenerate(p, vals);
   };
+
+  // Preselect the prefab that was dragged in from the toolbox.
+  useEffect(() => {
+    if (!initialPrefabId) return;
+    const p = [...BUILTIN_PREFABS, ...usePrefabs.getState().custom].find((x) => x.id === initialPrefabId);
+    if (p) choose(p);
+  }, [initialPrefabId]); // run once on open
 
   const setValue = (key: string, v: Value) => {
     if (!prefab) return;

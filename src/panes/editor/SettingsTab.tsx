@@ -34,8 +34,7 @@ function AddRow({ onAdd }: { onAdd: (k: string, v: string) => void }) {
 
 export function SettingsTab() {
   const doc = useStore((s) => s.doc);
-  const version = useStore((s) => s.proxyVersion);
-  const { apply, setProxyVersion } = useStore.getState();
+  const { apply } = useStore.getState();
 
   return (
     <div className="settings-tab">
@@ -67,15 +66,6 @@ export function SettingsTab() {
           </fieldset>
         );
       })}
-
-      <fieldset className="settings-section app-settings">
-        <legend>Preview options (not saved in the file)</legend>
-        <div className="kv-row">
-          <label htmlFor="pv">Proxy version label</label>
-          <CommitInput id="pv" className="mono" value={version} onCommit={(v) => setProxyVersion(v)} />
-        </div>
-        <p className="muted small">RollCall shows each proxy net with the proxy software version, e.g. “IQ Frames 0000:01:00 (4.9 .0)”.</p>
-      </fieldset>
     </div>
   );
 }

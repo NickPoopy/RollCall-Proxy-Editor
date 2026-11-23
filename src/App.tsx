@@ -4,7 +4,7 @@ import { Toolbar, useFileActions } from './app/Toolbar';
 import { StatusBar } from './app/StatusBar';
 import { RawTextPane } from './panes/RawTextPane';
 import { EditorPane } from './panes/EditorPane';
-import { PreviewPane } from './panes/PreviewPane';
+import { ToolboxPane, ToolDialogHost } from './panes/ToolboxPane';
 import { useStore } from './state/store';
 import { readFile } from './state/files';
 
@@ -47,20 +47,21 @@ export default function App() {
       onDrop={onDrop}
     >
       <Toolbar />
-      <PanelGroup direction="horizontal" autoSaveId="rpe.panes" className="panes">
+      <PanelGroup direction="horizontal" autoSaveId="rpe.panes.v2" className="panes">
         <Panel defaultSize={34} minSize={15}>
           <RawTextPane />
         </Panel>
         <PanelResizeHandle className="resize-handle" />
-        <Panel defaultSize={36} minSize={20}>
+        <Panel defaultSize={42} minSize={20}>
           <EditorPane />
         </Panel>
         <PanelResizeHandle className="resize-handle" />
-        <Panel defaultSize={30} minSize={15}>
-          <PreviewPane />
+        <Panel defaultSize={24} minSize={14}>
+          <ToolboxPane />
         </Panel>
       </PanelGroup>
       <StatusBar />
+      <ToolDialogHost />
       {toast && (
         <div className={`toast toast-${toast.kind}`} role="status" onClick={() => useStore.setState({ toast: null })}>
           {toast.message}

@@ -8,10 +8,10 @@ import type { FileEncoding } from './files';
 import type { SchemeMap } from '../model/ipscheme';
 import { schemesFor } from './schemes';
 
-export type Origin = 'text' | 'editor' | 'preview';
+export type Origin = 'text' | 'editor';
 
 interface Derived {
-  /** Last model that parsed without errors. The editor and preview show this. */
+  /** Last model that parsed without errors. The editor shows this. */
   doc: ProxyDoc;
   /** Line positions in the current text. */
   lineIndex: LineIndex;
@@ -36,7 +36,6 @@ export interface AppState extends Derived {
   future: string[];
   lastPushAt: number;
   toast: { message: string; kind: 'error' | 'info' } | null;
-  proxyVersion: string;
 
   /** Text typed in the raw pane. */
   setText: (text: string) => void;
@@ -53,7 +52,6 @@ export interface AppState extends Derived {
   redo: () => void;
   markSaved: (meta: { fileName?: string; fileHandle?: FileSystemFileHandle | null }) => void;
   showToast: (message: string, kind?: 'error' | 'info') => void;
-  setProxyVersion: (v: string) => void;
 }
 
 const HISTORY_LIMIT = 200;
@@ -77,13 +75,6 @@ function derive(text: string, prevDoc: ProxyDoc | null, prevIssues: Diagnostic[]
   };
 }
 
-function readVersion(): string {
-  try {
-    return localStorage.getItem('rpe.proxyVersion') || '4.9 .0';
-  } catch {
-    return '4.9 .0';
-  }
-}
 
 export const useStore = create<AppState>((set, get) => ({
   ...derive('', null, []),
@@ -98,7 +89,6 @@ export const useStore = create<AppState>((set, get) => ({
   future: [],
   lastPushAt: 0,
   toast: null,
-  proxyVersion: readVersion(),
 
   setText: (text) => {
     const s = get();
@@ -213,15 +203,6 @@ export const useStore = create<AppState>((set, get) => ({
     setTimeout(() => {
       if (get().toast === shown) set({ toast: null });
     }, 4000);
-  },
-
-  setProxyVersion: (v) => {
-    try {
-      localStorage.setItem('rpe.proxyVersion', v);
-    } catch {
-      /* storage unavailable */
-    }
-    set({ proxyVersion: v });
   },
 }));
 
