@@ -5,6 +5,7 @@ import { labelOf, type Tree, type TreeNode } from '../../model/tree';
 import type { NetAddr } from '../../model/types';
 import { useStore } from '../../state/store';
 import { useSchemes } from '../../state/schemes';
+import { deleteNet } from '../../state/deleteNet';
 import { canHoldChildren, runTool, useToolDrag } from '../../state/toolbox';
 
 interface Props {
@@ -238,6 +239,23 @@ export function NodeTree({ tree, filter, command }: Props) {
   }, [toolDragging]);
   const selected = useStore((s) => s.selected);
   const issues = useStore((s) => s.issues);
+
+  // Delete key removes the selected net, unless you're typing somewhere, a dialog is
+  // open, or you're working in the toolbox.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' || e.ctrlKey || e.altKey || e.metaKey || e.repeat) return;
+      const sel = useStore.getState().selected;
+      if (!sel) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest('input, textarea, select, [contenteditable="true"], .cm-editor, .toolbox-pane')) return;
+      if (document.querySelector('.modal')) return;
+      e.preventDefault();
+      deleteNet(sel, 'branch');
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const issueAddrs = useMemo(() => {
     const m = new Map<NetAddr, 'error' | 'warning'>();

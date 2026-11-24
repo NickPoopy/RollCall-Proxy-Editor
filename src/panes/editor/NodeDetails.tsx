@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useFocusName } from '../../state/toolbox';
+import { deleteNet } from '../../state/deleteNet';
 import { childDigit, depthOf, displayAddr, inSubtree, isValidAddr, MAX_DEPTH, ROOT } from '../../model/address';
-import { addChild, addIpShare, moveSubtree, rebaseAddr, removeIpShare, removeSubtree, setNetName, shiftNet, updateIpShare } from '../../model/ops';
+import { addChild, addIpShare, moveSubtree, rebaseAddr, removeIpShare, setNetName, shiftNet, updateIpShare } from '../../model/ops';
 import { SCHEME_LABEL, SCHEMES, schemeFor, schemeSource, suggestDevice, type Scheme } from '../../model/ipscheme';
 import { useFileSchemes, useSchemes } from '../../state/schemes';
 import { labelOf, type TreeNode } from '../../model/tree';
@@ -25,7 +26,6 @@ export function NodeDetails({ node }: { node: TreeNode }) {
   const [prefabDraft, setPrefabDraft] = useState<Prefab | null>(null);
   const isRoot = node.addr === ROOT;
   const canHaveChildren = depthOf(node.addr) < MAX_DEPTH;
-  const subtreeSize = countSubtree(node);
   const fileName = useStore((s) => s.fileName);
   const netNames = useStore((s) => s.doc.netNames);
   const schemes = useFileSchemes(fileName);
@@ -72,14 +72,7 @@ export function NodeDetails({ node }: { node: TreeNode }) {
     }) && to) select(to, 'editor');
   };
 
-  const onDelete = () => {
-    const what =
-      subtreeSize.nets + subtreeSize.devices > 1
-        ? `"${labelOf(node)}" and everything under it (${subtreeSize.nets} net(s), ${subtreeSize.devices} device(s))`
-        : `"${labelOf(node)}"`;
-    if (!window.confirm(`Delete ${what}?`)) return;
-    if (apply((d) => removeSubtree(d, node.addr))) select(null, 'editor');
-  };
+  const onDelete = () => deleteNet(node.addr, 'always');
 
   return (
     <div className="details">
@@ -162,7 +155,7 @@ export function NodeDetails({ node }: { node: TreeNode }) {
             </button>
             <button onClick={() => onShift(-1)} title="Move up one slot (swaps with the sibling there)">↑</button>
             <button onClick={() => onShift(1)} title="Move down one slot (swaps with the sibling there)">↓</button>
-            <button className="danger" onClick={onDelete}>Delete</button>
+            <button className="danger" onClick={onDelete} title="Delete this net and everything under it (or press the Delete key in the tree)">Delete</button>
           </>
         )}
       </div>
@@ -202,15 +195,4 @@ export function NodeDetails({ node }: { node: TreeNode }) {
       {prefabDraft && <PrefabEditor initial={prefabDraft} onClose={() => setPrefabDraft(null)} />}
     </div>
   );
-}
-
-function countSubtree(node: TreeNode): { nets: number; devices: number } {
-  let nets = node.named ? 1 : 0;
-  let devices = node.devices.length;
-  for (const c of node.children) {
-    const r = countSubtree(c);
-    nets += r.nets;
-    devices += r.devices;
-  }
-  return { nets, devices };
 }
